@@ -132,6 +132,7 @@ def run(src: str, out_root: Path, *, with_notes: bool = True, keep_video: bool =
         _render(folder)
         return folder
     usage["seconds"] = round(time.monotonic() - t0, 1)
+    progress(f"  {usage['input_tokens']:,} tokens in, {usage['output_tokens']:,} out, {usage['seconds']} s")
     return add_notes(folder, result, usage)
 
 

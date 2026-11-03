@@ -28,7 +28,7 @@ class Detail(BaseModel):
 
 
 class Notes(BaseModel):
-    title: str = Field(description="a short, specific title — not the creator's clickbait")
+    title: str = Field(description="a specific title under 60 characters — not the creator's clickbait")
     summary: str = Field(description="2-3 sentences: what the video says or shows")
     category: str = Field(description="one of: " + ", ".join(CATEGORIES))
     key_points: list[str] = Field(description="0-6 points worth remembering")
