@@ -9,9 +9,9 @@ import re
 import subprocess
 from pathlib import Path
 
-WHISPER_MODEL = os.environ.get("VNOTES_WHISPER_MODEL", "mlx-community/whisper-large-v3-turbo")
+WHISPER_MODEL = os.environ.get("MOODSCROLL_WHISPER_MODEL", "mlx-community/whisper-large-v3-turbo")
 SWIFT_DIR = Path(__file__).parent / "swift"
-CACHE = Path.home() / ".cache" / "vnotes"
+CACHE = Path.home() / ".cache" / "moodscroll"
 
 
 # --- Speech to text ----------------------------------------------------------------

@@ -1,11 +1,11 @@
-"""vnotes as an MCP server, so Claude Desktop or Claude Code can use it directly.
+"""moodscroll as an MCP server, so Claude Desktop or Claude Code can use it directly.
 
-In this mode vnotes never calls the Claude API. It does the local work and hands
+In this mode moodscroll never calls the Claude API. It does the local work and hands
 Claude the transcript, on-screen text and key frames; Claude writes the notes in
 the conversation (on the user's own Claude plan) and saves them back with
 save_notes. No API key needed.
 
-    claude mcp add vnotes -- uv --directory /path/to/vnotes run vnotes-mcp
+    claude mcp add moodscroll -- uv --directory /path/to/moodscroll run moodscroll-mcp
 """
 
 from __future__ import annotations
@@ -24,8 +24,8 @@ from .notes import CATEGORIES, SYSTEM, Notes, build_prompt
 FRAMES_FOR_CLAUDE = 4
 
 server = MCPServer(
-    name="vnotes",
-    instructions=f"""vnotes turns videos (Instagram, TikTok, YouTube, local files) into notes.
+    name="moodscroll",
+    instructions=f"""moodscroll turns videos (Instagram, TikTok, YouTube, local files) into notes.
 To make notes: call process_video, read what it returns, then call save_notes with
 notes you write yourself. {SYSTEM}
 Categories: {", ".join(CATEGORIES)}.

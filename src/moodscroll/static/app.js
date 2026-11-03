@@ -1,4 +1,4 @@
-// vnotes web app: no framework, two views (home and note), routed by the URL hash.
+// moodscroll web app: no framework, two views (home and note), routed by the URL hash.
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const view = $("#view");
@@ -36,7 +36,7 @@ $("#search").addEventListener("input", () => {
 
 function showHome() {
   view.onclick = null;
-  document.title = "vnotes";
+  document.title = "MOODscroll";
   view.replaceChildren($("#home").content.cloneNode(true));
   $("#add-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -145,7 +145,7 @@ async function showNote(folder) {
   const n = d.notes, m = d.meta;
   const frameUrl = (f) => `/media/${encodeURIComponent(d.folder)}/frames/${f.file}`;
   const title = n?.title || m.title || d.folder;
-  document.title = `${title} · vnotes`;
+  document.title = `${title} · MOODscroll`;
 
   const list = (items, tag = "ul", cls = "") =>
     items?.length ? `<${tag} class="${cls}">${items.map((x) => `<li>${esc(x)}</li>`).join("")}</${tag}>` : "";
@@ -208,5 +208,12 @@ async function showNote(folder) {
   });
   window.scrollTo(0, 0);
 }
+
+$("#quit").addEventListener("click", async (e) => {
+  e.preventDefault();
+  if (!confirm("Quit MOODscroll? Videos still processing will stop.")) return;
+  await fetch("/api/quit", { method: "POST" }).catch(() => {});
+  document.body.innerHTML = '<main><p class="empty">MOODscroll has quit. Open it again from Applications or Spotlight.</p></main>';
+});
 
 route();

@@ -1,4 +1,4 @@
-"""vnotes <file-or-link> — turn a video into notes."""
+"""moodscroll <file-or-link> — turn a video into notes."""
 
 from __future__ import annotations
 
@@ -6,20 +6,13 @@ import argparse
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 from . import library, pipeline, sources
-
-# The API key lives in a private file, never in the code: ./.env when run from the
-# repo, or ~/.config/vnotes/.env when installed. Real environment variables win.
-load_dotenv(Path.cwd() / ".env")
-load_dotenv(Path.home() / ".config" / "vnotes" / ".env")
 
 DEFAULT_OUT = library.DEFAULT_ROOT
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="vnotes", description="Turn a video into notes, locally.")
+    p = argparse.ArgumentParser(prog="moodscroll", description="Turn a video into notes, locally.")
     p.add_argument("source", nargs="+", help="video file(s) or link(s): Instagram, TikTok, YouTube...")
     p.add_argument("-o", "--out", type=Path, default=DEFAULT_OUT, help=f"output folder (default {DEFAULT_OUT})")
     p.add_argument("--no-notes", action="store_true", help="skip the Claude step; stay fully offline after download")

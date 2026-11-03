@@ -1,7 +1,7 @@
-"""vnotes in the browser: drop a video or paste a link, watch it being processed,
+"""moodscroll in the browser: drop a video or paste a link, watch it being processed,
 read the note next to the video, search everything saved.
 
-    uv run vnotes-web        # then open http://127.0.0.1:8765
+    uv run moodscroll-web        # then open http://127.0.0.1:8765
 
 Same engine as the command line (pipeline.run, notes through the Claude API) and
 the same library as the MCP server. Listens on this Mac only.
@@ -9,6 +9,7 @@ the same library as the MCP server. Listens on this Mac only.
 
 from __future__ import annotations
 
+import os
 import queue
 import shutil
 import tempfile
@@ -18,20 +19,30 @@ import uuid
 import webbrowser
 from pathlib import Path
 
-from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import library, pipeline, sources
 
-load_dotenv(Path.cwd() / ".env")
-load_dotenv(Path.home() / ".config" / "vnotes" / ".env")
-
 STATIC = Path(__file__).parent / "static"
 VIDEO_TYPES = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
 
-app = FastAPI(title="vnotes")
+app = FastAPI(title="MOODscroll")
+
+ALLOWED_HOSTS = {"127.0.0.1:8765", "localhost:8765"}
+
+
+@app.middleware("http")
+async def only_this_app(request, call_next):
+    # The server only listens on this Mac, but any web page open in the browser can
+    # still send requests to 127.0.0.1. Refuse requests from other sites (Origin)
+    # and from look-alike domains pointed at this Mac (Host, "DNS rebinding").
+    origin = request.headers.get("origin")
+    if request.headers.get("host") not in ALLOWED_HOSTS or (
+            origin and origin.removeprefix("http://") not in ALLOWED_HOSTS):
+        return JSONResponse({"detail": "forbidden"}, status_code=403)
+    return await call_next(request)
 
 
 # --- Jobs ---------------------------------------------------------------------------
@@ -95,7 +106,7 @@ async def create_job(url: str | None = Form(None), file: UploadFile | None = Fil
         suffix = Path(file.filename).suffix.lower()
         if suffix not in VIDEO_TYPES:
             raise HTTPException(400, f"not a video file ({suffix or 'no extension'})")
-        tmpdir = Path(tempfile.mkdtemp(prefix="vnotes-upload-"))
+        tmpdir = Path(tempfile.mkdtemp(prefix="moodscroll-upload-"))
         path = tmpdir / f"{Path(file.filename).stem}{suffix}"
         with open(path, "wb") as f:
             shutil.copyfileobj(file.file, f)
@@ -151,15 +162,30 @@ def media(name: str, path: str):
     return FileResponse(file)
 
 
+@app.post("/api/quit")
+def quit_app():
+    # The app keeps running in the background after its window is closed; this is
+    # the off switch (the footer's "Quit" link). Exit just after replying.
+    threading.Timer(0.3, lambda: os._exit(0)).start()
+    return {"ok": True}
+
+
 app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")
+
+HOST, PORT = "127.0.0.1", 8765  # this Mac only; nothing else on the network can reach it
 
 
 def main() -> None:
+    import argparse
+
     import uvicorn
 
-    host, port = "127.0.0.1", 8765  # this Mac only; nothing else on the network can reach it
-    threading.Timer(1.0, lambda: webbrowser.open(f"http://{host}:{port}")).start()
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+    p = argparse.ArgumentParser(prog="moodscroll-web", description="Run the MOODscroll web app.")
+    p.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
+    args = p.parse_args()
+    if not args.no_browser:
+        threading.Timer(1.0, lambda: webbrowser.open(f"http://{HOST}:{PORT}")).start()
+    uvicorn.run(app, host=HOST, port=PORT, log_level="warning")
 
 
 if __name__ == "__main__":

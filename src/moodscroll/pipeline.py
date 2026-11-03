@@ -57,7 +57,7 @@ def extract(src: str, out_root: Path, *, keep_video: bool = False,
         timings[name] = round(time.monotonic() - t0, 1)
         return result
 
-    with tempfile.TemporaryDirectory(prefix="vnotes-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="moodscroll-") as tmp:
         work = Path(tmp)
         source = step("fetching", sources.resolve, src, work)
         source.meta["duration_s"] = source.meta.get("duration_s") or media.duration(source.video)

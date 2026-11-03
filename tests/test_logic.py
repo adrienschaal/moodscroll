@@ -1,8 +1,8 @@
-from vnotes.media import clean_segments, dedupe_ocr, subsample
-from vnotes.notes import Detail, Notes
-from vnotes.pipeline import slugify
-from vnotes.render import markdown
-from vnotes.sources import instagram_code, is_url
+from moodscroll.media import clean_segments, dedupe_ocr, subsample
+from moodscroll.notes import Detail, Notes
+from moodscroll.pipeline import slugify
+from moodscroll.render import markdown
+from moodscroll.sources import instagram_code, is_url
 
 
 def seg(start, text, logprob=-0.1, ratio=1.4):

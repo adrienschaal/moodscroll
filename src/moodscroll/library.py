@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .pipeline import load
 
-DEFAULT_ROOT = Path(os.environ.get("VNOTES_DIR", "~/vnotes")).expanduser()
+DEFAULT_ROOT = Path(os.environ.get("MOODSCROLL_DIR", "~/Moodscroll")).expanduser()
 
 
 def folders(root: Path | None = None) -> list[Path]:

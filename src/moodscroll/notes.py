@@ -12,8 +12,8 @@ from pydantic import BaseModel, Field
 
 from .media import subsample
 
-MODEL = os.environ.get("VNOTES_MODEL", "claude-opus-5-5")
-EFFORT = os.environ.get("VNOTES_EFFORT", "medium")
+MODEL = os.environ.get("MOODSCROLL_MODEL", "claude-opus-5-5")
+EFFORT = os.environ.get("MOODSCROLL_EFFORT", "medium")
 FRAMES_FOR_CLAUDE = 4
 
 CATEGORIES = [
@@ -99,7 +99,7 @@ def make_notes(meta: dict, transcript: dict, ocr: list[dict], frames_dir: Path, 
         # The SDK only notices missing credentials when it builds the request.
         if "authentication" not in str(e):
             raise
-        raise NotesUnavailable("no Claude API key: set ANTHROPIC_API_KEY") from e
+        raise NotesUnavailable("no Claude API key: add one with moodscroll-setup, or use MOODscroll inside Claude") from e
     except anthropic.APIConnectionError as e:
         raise NotesUnavailable("could not reach the Claude API") from e
     except anthropic.RateLimitError as e:

@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from vnotes import library, pipeline
-from vnotes.notes import Notes
+from moodscroll import library, pipeline
+from moodscroll.notes import Notes
 
 
 def make_folder(root, name, title, transcript="", caption=""):

@@ -3,7 +3,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from vnotes import library, web
+from moodscroll import library, web
 
 
 @pytest.fixture
@@ -16,7 +16,7 @@ def client(tmp_path, monkeypatch):
     (folder / "note.md").write_text("# Clip\n")
     (tmp_path / "secret.txt").write_text("nope")
     monkeypatch.setattr(library, "DEFAULT_ROOT", tmp_path)
-    return TestClient(web.app)
+    return TestClient(web.app, base_url="http://127.0.0.1:8765")
 
 
 def test_library_and_note(client):
@@ -38,3 +38,9 @@ def test_job_input_is_validated(client):
     r = client.post("/api/jobs", files={"file": ("notes.txt", b"x", "text/plain")})
     assert r.status_code == 400 and "not a video" in r.json()["detail"]
     assert client.post("/api/jobs").status_code == 400
+
+
+def test_other_websites_are_refused(client):
+    assert client.post("/api/jobs", data={"url": "https://x.com/v"}, headers={"origin": "https://evil.example"}).status_code == 403
+    assert client.get("/api/library", headers={"host": "evil.example:8765"}).status_code == 403
+    assert client.get("/api/library", headers={"origin": "http://127.0.0.1:8765"}).status_code == 200
