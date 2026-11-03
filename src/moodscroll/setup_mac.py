@@ -3,7 +3,7 @@ it is safe to run again (each step skips what is already done).
 
     moodscroll-setup               # asks before each optional step
     moodscroll-setup --yes         # accepts every step, never asks
-    moodscroll-setup --uninstall   # removes the app and the Claude connections
+    moodscroll-setup --uninstall   # removes the app and the Claude Code / Codex connections
 """
 
 from __future__ import annotations
@@ -19,11 +19,17 @@ import sys
 from pathlib import Path
 
 from . import KEY_FILE, library, media
+from .notes import ASK_PHRASE
 
 REPO = Path(__file__).resolve().parents[2]
 APP = Path.home() / "Applications" / "MOODscroll.app"
 ICON = REPO / "assets" / "AppIcon.icns"
 DESKTOP_CONFIG = Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+CODEX_CONFIG = Path.home() / ".codex" / "config.toml"
+# Codex ships inside the ChatGPT desktop app; a separate CLI install may also exist.
+CODEX_BINARIES = ("/Applications/ChatGPT.app/Contents/Resources/codex", "/Applications/Codex.app/Contents/Resources/codex")
+# Codex stops waiting on a tool after 60 s by default; a long video takes longer.
+CODEX_TIMEOUTS = 'startup_timeout_sec = 60\ntool_timeout_sec = 900\n'
 LOG = Path.home() / "Library" / "Logs" / "MOODscroll.log"
 MCP_NAME = "moodscroll"
 
@@ -45,7 +51,11 @@ def note(msg: str) -> None:
 def ask(question: str, yes: bool) -> bool:
     if yes:
         return True
-    answer = input(f"  {question} [Y/n] ").strip().lower()
+    try:
+        answer = input(f"  {question} [Y/n] ").strip().lower()
+    except EOFError:  # no keyboard (run from a script): don't change anything
+        print()
+        return False
     return answer in ("", "y", "yes")
 
 
@@ -55,6 +65,15 @@ def uv() -> str:
 
 def mcp_command() -> dict:
     return {"command": uv(), "args": ["--directory", str(REPO), "run", "moodscroll-mcp"]}
+
+
+def codex() -> str | None:
+    return shutil.which("codex") or next((c for c in CODEX_BINARIES if os.access(c, os.X_OK)), None)
+
+
+def claude() -> str | None:
+    return shutil.which("claude") or next(
+        (str(c) for c in (Path.home() / ".local/bin/claude", Path.home() / ".claude/local/claude") if c.exists()), None)
 
 
 # --- Steps --------------------------------------------------------------------------
@@ -74,19 +93,21 @@ def ocr_helper() -> None:
 
 
 def api_key(yes: bool) -> None:
-    say("3/5  Claude API key (for the app and the command line; not needed in Claude itself)")
+    say("5/5  Claude API key (optional)")
+    note("Not needed if you use Claude Code or Codex: they write the notes on your subscription.")
+    note("With a key, the MOODscroll app also writes notes by itself, about $0.04 a video.")
     import anthropic
 
     if os.environ.get("ANTHROPIC_API_KEY"):
         done(f"already set ({KEY_FILE if KEY_FILE.exists() else 'environment'})")
         return
     if yes:
-        note(f"skipped; add one later: moodscroll-setup, or put ANTHROPIC_API_KEY=… in {KEY_FILE}")
+        note("skipped; run the installer again any time to add one")
         return
-    note("Create one at https://platform.claude.com/settings/keys (about $0.04 a video).")
+    note("Create one at https://platform.claude.com/settings/keys")
     key = getpass.getpass("  Paste it here (typing is hidden), or press Enter to skip: ").strip()
     if not key:
-        note("skipped; the app still transcribes, notes need a key")
+        note("skipped; videos you add in the app wait for Claude Code or Codex to write their notes")
         return
     try:
         anthropic.Anthropic(api_key=key).models.list(limit=1)
@@ -108,7 +129,7 @@ def save_key(key: str) -> None:
 
 
 def mac_app(yes: bool) -> None:
-    say("4/5  MOODscroll app (Applications, Spotlight, Launchpad, Dock)")
+    say("3/5  MOODscroll app (Applications, Spotlight, Launchpad, Dock)")
     if not ask(f"Create {APP}?", yes):
         note("skipped; start it with: uv run moodscroll-web")
         return
@@ -149,28 +170,49 @@ open "$URL"
     done(f"{APP} — open it from Spotlight (⌘ Space, type MOODscroll); drag it to the Dock to keep it")
 
 
-def claude_connections(yes: bool) -> None:
-    say("5/5  Use MOODscroll inside Claude (your Claude plan writes the notes, no API key)")
-    if shutil.which("claude"):
+def connect_assistants(yes: bool) -> None:
+    say("4/5  Connect it to Claude Code and Codex (your subscription writes the notes, no API key)")
+    found = False
+    if c := claude():
+        found = True
         if ask("Connect it to Claude Code?", yes):
-            subprocess.run(["claude", "mcp", "remove", MCP_NAME, "--scope", "user"], capture_output=True)
+            subprocess.run([c, "mcp", "remove", MCP_NAME, "--scope", "user"], capture_output=True)
             cmd = mcp_command()
-            r = subprocess.run(["claude", "mcp", "add", MCP_NAME, "--scope", "user", "--",
+            r = subprocess.run([c, "mcp", "add", MCP_NAME, "--scope", "user", "--",
                                 cmd["command"], *cmd["args"]], capture_output=True, text=True)
             done("Claude Code: connected") if r.returncode == 0 else note(f"Claude Code: failed: {r.stderr.strip()}")
-    else:
-        note("Claude Code not found; skipped")
-
-    if DESKTOP_CONFIG.parent.exists():
-        if ask("Connect it to the Claude desktop app?", yes):
+        # The Claude desktop app's chat reads its own config, not Claude Code's.
+        if DESKTOP_CONFIG.parent.exists():
             config = json.loads(DESKTOP_CONFIG.read_text()) if DESKTOP_CONFIG.exists() else {}
             if DESKTOP_CONFIG.exists():
                 shutil.copy2(DESKTOP_CONFIG, DESKTOP_CONFIG.with_name(DESKTOP_CONFIG.name + ".bak"))
             config.setdefault("mcpServers", {})[MCP_NAME] = mcp_command()
             _write_json(DESKTOP_CONFIG, config)
-            done("Claude desktop app: connected — quit Claude (⌘Q) and reopen it to load it")
+    if c := codex():
+        found = True
+        if ask("Connect it to Codex?", yes):
+            ok = connect_codex(c)
+            done("Codex: connected") if ok else note("Codex: failed; see the README to add it by hand")
+    if not found:
+        note("Neither Claude Code nor Codex found. Install one, then run this again;")
+        note("or add an API key above so the MOODscroll app writes notes by itself.")
     else:
-        note("Claude desktop app not found; skipped")
+        note("Quit and reopen Claude / ChatGPT (⌘Q) so they load it.")
+
+
+def connect_codex(binary: str) -> bool:
+    subprocess.run([binary, "mcp", "remove", MCP_NAME], capture_output=True)
+    cmd = mcp_command()
+    r = subprocess.run([binary, "mcp", "add", MCP_NAME, "--", cmd["command"], *cmd["args"]],
+                       capture_output=True, text=True)
+    if r.returncode != 0 or not CODEX_CONFIG.exists():
+        return False
+    # Give it time to finish long videos: add the timeouts under its table.
+    header = f"[mcp_servers.{MCP_NAME}]\n"
+    text = CODEX_CONFIG.read_text()
+    if header in text and "tool_timeout_sec" not in text.split(header, 1)[1].split("\n[", 1)[0]:
+        CODEX_CONFIG.write_text(text.replace(header, header + CODEX_TIMEOUTS, 1))
+    return True
 
 
 def uninstall() -> None:
@@ -178,9 +220,12 @@ def uninstall() -> None:
     if APP.exists():
         shutil.rmtree(APP)
         done(f"removed {APP}")
-    if shutil.which("claude"):
-        subprocess.run(["claude", "mcp", "remove", MCP_NAME, "--scope", "user"], capture_output=True)
+    if c := claude():
+        subprocess.run([c, "mcp", "remove", MCP_NAME, "--scope", "user"], capture_output=True)
         done("disconnected from Claude Code")
+    if c := codex():
+        subprocess.run([c, "mcp", "remove", MCP_NAME], capture_output=True)
+        done("disconnected from Codex")
     if DESKTOP_CONFIG.exists():
         config = json.loads(DESKTOP_CONFIG.read_text())
         if config.get("mcpServers", {}).pop(MCP_NAME, None):
@@ -199,7 +244,7 @@ def _write_json(path: Path, data: dict) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(prog="moodscroll-setup", description=__doc__.split("\n")[0])
     p.add_argument("--yes", action="store_true", help="accept every step without asking")
-    p.add_argument("--uninstall", action="store_true", help="remove the app and the Claude connections")
+    p.add_argument("--uninstall", action="store_true", help="remove the app and the Claude Code / Codex connections")
     args = p.parse_args()
     if args.uninstall:
         uninstall()
@@ -207,13 +252,16 @@ def main() -> None:
     try:
         whisper_model()
         ocr_helper()
-        api_key(args.yes)
         mac_app(args.yes)
-        claude_connections(args.yes)
+        connect_assistants(args.yes)
+        api_key(args.yes)
     except KeyboardInterrupt:
         sys.exit("\nStopped. Run moodscroll-setup again any time; it picks up where it left off.")
     say("All set.")
-    note(f"Your notes will be in {library.DEFAULT_ROOT}")
+    print("  Open MOODscroll: ⌘ Space, type MOODscroll, Return.")
+    print('  In Claude Code or Codex, say: "make notes from <a link>", or after adding videos')
+    print(f'  in the app: "{ASK_PHRASE}".')
+    note(f"Your notes are saved in {library.DEFAULT_ROOT}")
 
 
 if __name__ == "__main__":

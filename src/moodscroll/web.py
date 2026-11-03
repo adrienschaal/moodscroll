@@ -3,12 +3,14 @@ read the note next to the video, search everything saved.
 
     uv run moodscroll-web        # then open http://127.0.0.1:8765
 
-Same engine as the command line (pipeline.run, notes through the Claude API) and
-the same library as the MCP server. Listens on this Mac only.
+Same engine as the command line and the same library as the MCP server. With an
+API key it writes notes itself; without one, videos wait in the library until
+Claude Code or Codex writes their notes. Listens on this Mac only.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import queue
 import shutil
@@ -19,11 +21,12 @@ import uuid
 import webbrowser
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import library, pipeline, sources
+from . import KEY_FILE, library, notes, pipeline, sources
 
 STATIC = Path(__file__).parent / "static"
 VIDEO_TYPES = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
@@ -71,8 +74,13 @@ def _worker() -> None:
             if upload:  # an uploaded file lives in a temp folder; keep it with its note
                 shutil.move(upload, folder / f"video{Path(upload).suffix.lower()}")
                 shutil.rmtree(Path(upload).parent, ignore_errors=True)
-            notes_error = pipeline.load(folder)["meta"].get("notes_error")
-            _update(job_id, status="done", folder=folder.name, step=None, notes_error=notes_error)
+                meta_file = folder / "meta.json"  # record the file's name, not the temp path
+                meta = json.loads(meta_file.read_text())
+                meta["source"] = job["label"]
+                meta_file.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n")
+            d = pipeline.load(folder)
+            _update(job_id, status="done", folder=folder.name, step=None,
+                    waiting=d["notes"] is None, notes_error=d["meta"].get("notes_error"))
         except Exception as e:  # shown to the user in the job list
             _update(job_id, status="failed", error=str(e), step=None)
         finally:
@@ -118,6 +126,13 @@ async def create_job(url: str | None = Form(None), file: UploadFile | None = Fil
 def list_jobs():
     with _lock:
         return sorted((_public(j) for j in jobs.values()), key=lambda j: -j["created"])
+
+
+@app.get("/api/status")
+def status():
+    load_dotenv(KEY_FILE)  # moodscroll-setup may have added a key while the app runs
+    return {"has_key": notes.has_key(), "ask_phrase": notes.ASK_PHRASE,
+            "waiting": len(library.waiting())}
 
 
 # --- Library ------------------------------------------------------------------------

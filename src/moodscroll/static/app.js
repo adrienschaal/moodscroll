@@ -15,8 +15,10 @@ async function api(path, opts) {
 // --- Routing ------------------------------------------------------------------------
 
 let pollTimer = null;
+let liveTimer = null;
 function route() {
   clearTimeout(pollTimer);
+  clearInterval(liveTimer);
   const m = location.hash.match(/^#\/note\/(.+)$/);
   if (m) showNote(decodeURIComponent(m[1]));
   else showHome();
@@ -60,7 +62,50 @@ function showHome() {
 
   pollJobs();
   loadLibrary();
+  loadStatus();
+  // Notes written in Claude Code or Codex land in the same library: while anything
+  // is waiting, check every few seconds so they appear without a reload.
+  liveTimer = setInterval(() => {
+    if (status?.waiting && !document.hidden) { loadStatus(); loadLibrary(); }
+  }, 4000);
 }
+
+// Without an API key, Claude Code or Codex writes the notes. Say so, with the
+// exact words to use, so a video "waiting for notes" never looks broken.
+let status = null;
+const askBox = (phrase) =>
+  `<code>${esc(phrase)}</code> <button class="ghost small" data-copy="${esc(phrase)}">Copy</button>`;
+
+async function loadStatus() {
+  status = await api("/api/status");
+  const box = $("#banner");
+  if (!box) return;
+  const waiting = status.waiting
+    ? `<span class="count">${status.waiting} video${status.waiting > 1 ? "s" : ""} waiting for notes.</span> ` : "";
+  if (!status.has_key) {
+    box.innerHTML = `<div class="banner">
+      <p><b>Your notes are written by Claude Code or Codex.</b> ${waiting}Add videos here
+      whenever you like, then tell Claude Code or Codex: ${askBox(status.ask_phrase)}</p>
+      <p class="fine">They appear here as soon as they're written. Prefer this app to write them by
+      itself? Run the installer again and add a Claude API key (about $0.04 a video).</p></div>`;
+  } else {
+    box.innerHTML = status.waiting
+      ? `<div class="banner"><p>${waiting}Tell Claude Code or Codex: ${askBox(status.ask_phrase)}</p></div>` : "";
+  }
+}
+
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-copy]");
+  if (!b) return;
+  e.preventDefault();
+  await navigator.clipboard.writeText(b.dataset.copy);
+  b.textContent = "Copied";
+  setTimeout(() => (b.textContent = "Copy"), 1500);
+});
+window.addEventListener("focus", () => {
+  if (location.hash.startsWith("#/note/")) return;
+  loadStatus(); loadLibrary();
+});
 
 async function uploadFiles(files) {
   for (const f of files) {
@@ -88,15 +133,15 @@ async function pollJobs() {
   box.innerHTML = jobs.map((j) => `
     <div class="job">
       ${j.status === "running" ? '<div class="spinner"></div>' : ""}
-      <span class="pill ${j.status}">${j.status}</span>
+      <span class="pill ${j.waiting ? "waiting" : j.status}">${j.waiting ? "waiting for notes" : j.status}</span>
       <span class="label">${esc(j.label)}</span>
-      <span class="step">${esc(j.step || j.error || (j.notes_error ? "saved without AI notes: " + j.notes_error : ""))}</span>
+      <span class="step">${esc(j.step || j.error || (j.notes_error ? "notes failed: " + j.notes_error : ""))}</span>
       ${j.folder ? `<a href="#/note/${encodeURIComponent(j.folder)}">Open note →</a>` : ""}
     </div>`).join("");
 
   const newlyDone = jobs.filter((j) => j.status === "done" && !seenDone.has(j.id));
   newlyDone.forEach((j) => seenDone.add(j.id));
-  if (newlyDone.length) loadLibrary();
+  if (newlyDone.length) { loadLibrary(); loadStatus(); }
   if (jobs.some((j) => j.status === "queued" || j.status === "running")) {
     pollTimer = setTimeout(pollJobs, 1000);
   }
@@ -125,6 +170,7 @@ async function loadLibrary() {
     <a class="card" href="#/note/${encodeURIComponent(i.folder)}">
       <div class="thumb" style="background-image:url('${i.thumb ? `/media/${encodeURIComponent(i.folder)}/frames/${i.thumb}` : ""}')"></div>
       <div class="body">
+        ${i.has_notes ? "" : '<span class="badge">Waiting for notes</span>'}
         <div class="title">${esc(i.title || i.folder)}</div>
         <div class="sub">${esc([i.author, i.category].filter(Boolean).join(" · "))}</div>
       </div>
@@ -135,6 +181,8 @@ async function loadLibrary() {
 // --- Note: video beside the notes, every timestamp clickable ------------------------
 
 async function showNote(folder) {
+  clearInterval(liveTimer);
+  if (!status) loadStatus().catch(() => {});
   let d;
   try {
     d = await api(`/api/notes/${encodeURIComponent(folder)}`);
@@ -142,6 +190,9 @@ async function showNote(folder) {
     view.innerHTML = `<p class="empty">Note not found. <a href="#/">Back</a></p>`;
     return;
   }
+  // The folder is renamed after its title once notes are written; follow it.
+  const here = `#/note/${encodeURIComponent(d.folder)}`;
+  if (location.hash !== here) history.replaceState(null, "", here);
   const n = d.notes, m = d.meta;
   const frameUrl = (f) => `/media/${encodeURIComponent(d.folder)}/frames/${f.file}`;
   const title = n?.title || m.title || d.folder;
@@ -166,7 +217,9 @@ async function showNote(folder) {
         <div class="meta">${esc([m.author, m.site, m.duration_s && ts(m.duration_s)].filter(Boolean).join(" · "))}
           ${m.source?.startsWith("http") ? ` · <a href="${esc(m.source)}" target="_blank" rel="noopener">original</a>` : ""}</div>
         ${n ? `<p class="summary">${esc(n.summary)}</p>`
-            : `<p class="warn">No AI notes for this video${m.notes_error ? ": " + esc(m.notes_error) : ""}.</p>`}
+            : `<div class="banner"><p><b>Waiting for notes.</b>${m.notes_error ? ` (Notes failed: ${esc(m.notes_error)}.)` : ""}
+                Tell Claude Code or Codex: ${askBox(status?.ask_phrase || "finish my MOODscroll notes")}</p>
+                <p class="fine">This page updates by itself when they're written.</p></div>`}
         ${n ? section("Key points", list(n.key_points))
             + section("Details", n.details.length ? `<dl class="details">${n.details.map((x) =>
                 `<dt>${esc(x.label)}</dt><dd>${esc(x.value)}</dd>`).join("")}</dl>` : "")
@@ -206,6 +259,13 @@ async function showNote(folder) {
     await navigator.clipboard.writeText(d.markdown);
     $("#copy").textContent = "Copied";
   });
+  if (!n) {  // waiting: show the notes the moment Claude Code or Codex saves them
+    liveTimer = setInterval(async () => {
+      if (document.hidden) return;
+      const fresh = await api(`/api/notes/${encodeURIComponent(d.folder)}`).catch(() => null);
+      if (fresh?.notes) { clearInterval(liveTimer); showNote(fresh.folder); }
+    }, 4000);
+  }
   window.scrollTo(0, 0);
 }
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 
-from .notes import Notes
+from .notes import WAITING_HINT, Notes
 
 
 def _ts(seconds: float) -> str:
@@ -46,7 +46,10 @@ def markdown(meta: dict, transcript: dict, ocr: list[dict], frames: list[dict], 
         if notes.claims_to_verify:
             out += ["## Claims to verify"] + [f"- {c}" for c in notes.claims_to_verify] + [""]
     else:
-        out += ["*No AI notes for this video" + (f": {meta['notes_error']}" if meta.get("notes_error") else "") + ".*", ""]
+        if meta.get("notes_error"):
+            out += [f"*Notes failed: {meta['notes_error']}. {WAITING_HINT}*", ""]
+        else:
+            out += [f"*{WAITING_HINT}*", ""]
 
     if meta.get("caption"):
         out += ["## Caption", "", meta["caption"].strip(), ""]

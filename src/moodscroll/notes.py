@@ -50,6 +50,16 @@ class NotesUnavailable(Exception):
     pass
 
 
+ASK_PHRASE = "finish my MOODscroll notes"
+WAITING_HINT = f'Waiting for notes. Ask Claude Code or Codex to "{ASK_PHRASE}".'
+
+
+def has_key() -> bool:
+    """Whether this Mac can write notes itself (through the Claude API). Without a
+    key, videos wait in the library until Claude Code or Codex writes their notes."""
+    return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+
+
 def _frame_block(path: Path) -> dict:
     data = base64.standard_b64encode(path.read_bytes()).decode()
     return {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": data}}
@@ -99,7 +109,7 @@ def make_notes(meta: dict, transcript: dict, ocr: list[dict], frames_dir: Path, 
         # The SDK only notices missing credentials when it builds the request.
         if "authentication" not in str(e):
             raise
-        raise NotesUnavailable("no Claude API key: add one with moodscroll-setup, or use MOODscroll inside Claude") from e
+        raise NotesUnavailable("no Claude API key") from e
     except anthropic.APIConnectionError as e:
         raise NotesUnavailable("could not reach the Claude API") from e
     except anthropic.RateLimitError as e:

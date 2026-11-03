@@ -11,8 +11,11 @@
 
 Two steps, so the notes can come from either place:
   extract()    everything local: fetch, transcribe, frames, OCR
-  add_notes()  attach notes, from the Claude API (CLI, web app) or from Claude
-               itself through the MCP server (your Claude subscription)
+  add_notes()  attach notes, from the Claude API (CLI, web app) or from Claude Code
+               or Codex through the MCP server (your subscription, no API key)
+
+A video with no notes yet is "waiting": the app shows it, and the MCP server's
+list_waiting tool lets Claude Code or Codex find it and write its notes.
 """
 
 from __future__ import annotations
@@ -107,6 +110,8 @@ def add_notes(folder: Path, result: Notes, usage: dict | None = None) -> Path:
     wanted = f"{date_prefix}-{slugify(result.title)}"
     if not folder.name.startswith(wanted):
         target = _unique_dir(folder.parent, wanted)
+        meta["previous_names"] = [*meta.get("previous_names", []), folder.name]
+        _write_json(folder / "meta.json", meta)
         folder.rename(target)
         folder = target
     _render(folder)
@@ -118,6 +123,9 @@ def run(src: str, out_root: Path, *, with_notes: bool = True, keep_video: bool =
     """The whole thing in one go, with notes from the Claude API."""
     folder = extract(src, out_root, keep_video=keep_video, progress=progress)
     if not with_notes:
+        return folder
+    if not notes.has_key():
+        progress(notes.WAITING_HINT)
         return folder
     data = load(folder)
     progress("writing notes with Claude...")

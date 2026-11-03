@@ -21,12 +21,23 @@ def folders(root: Path | None = None) -> list[Path]:
 
 def resolve_folder(name: str, root: Path | None = None) -> Path:
     """Turns a folder name from search results into a path, refusing anything that
-    would point outside the library (a tool argument is untrusted input)."""
+    would point outside the library (a tool argument is untrusted input). A folder is
+    renamed once its notes are written; its old name still finds it."""
     root = root or DEFAULT_ROOT
     path = (root / name).resolve()
-    if path.parent != root.resolve() or not (path / "meta.json").exists():
+    if path.parent != root.resolve():
         raise ValueError(f"no video folder named {name!r} in {root}")
-    return path
+    if (path / "meta.json").exists():
+        return path
+    for folder in folders(root):
+        if name in load(folder)["meta"].get("previous_names", []):
+            return folder
+    raise ValueError(f"no video folder named {name!r} in {root}")
+
+
+def waiting(root: Path | None = None) -> list[dict]:
+    """Videos that were processed but have no notes yet, oldest first."""
+    return [summary(f) for f in reversed(folders(root)) if not (f / "notes.json").exists()]
 
 
 def summary(folder: Path) -> dict:
@@ -43,6 +54,7 @@ def summary(folder: Path) -> dict:
         "duration_s": m.get("duration_s"),
         "thumb": d["frames"][0]["file"] if d["frames"] else None,
         "has_notes": n is not None,
+        "notes_error": m.get("notes_error"),
     }
 
 

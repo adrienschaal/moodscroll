@@ -3,99 +3,117 @@
 **Turn the videos you saved into notes you'll actually reread.**
 
 Paste an Instagram, TikTok or YouTube link, or drop in a video file. MOODscroll
-transcribes it on your Mac, reads the text on screen, picks the key frames, and writes
-a note: a summary, the key points, the exact quantities and steps, and the claims worth
-checking. The transcript is kept too. Every note goes into one library you can search,
-and clicking any line of the transcript jumps the video to that moment.
+transcribes it on your Mac, reads the text on screen and picks the key frames. Then
+Claude Code or Codex writes the note: a summary, the key points, the exact quantities
+and steps, and the claims worth checking. Every note goes into one library you can
+search, and clicking any line of the transcript jumps the video to that moment.
 
-It runs on your Mac. Nothing is hosted, there's no account, and your library is just a
-folder of Markdown files.
+It runs on your Mac. There's no account and no server, and your library is a folder of
+Markdown files.
 
 ---
 
+## How it works
+
+```
+  MOODscroll app                           Claude Code or Codex
+  ──────────────                           ────────────────────
+  paste links, drop videos                 "make notes from <link>"
+  read notes next to the video             "finish my MOODscroll notes"
+  search everything                        "what was that pizza recipe I saved?"
+            │                                         │
+            └──────────►  ~/Moodscroll  ◄─────────────┘
+                      one library, shared
+```
+
+- **The MOODscroll app** is where your library lives. You add videos, read the notes
+  beside the video and search them.
+- **Claude Code or Codex** writes the notes, on the subscription you already pay for.
+  You don't need an API key.
+
+Two ways to add a video:
+
+1. **In Claude Code or Codex:** say *"make notes from https://…"*. The note appears in
+   the app.
+2. **In the app:** paste a link or drop a file. MOODscroll does the transcript and the
+   frames right away, and the video shows **Waiting for notes**. Whenever you like, tell
+   Claude Code or Codex *"finish my MOODscroll notes"*. It writes the note for every
+   waiting video, and the app fills in by itself.
+
+**Prefer the app to write the notes by itself?** Add a Claude API key during install.
+Then videos you add in the app get their notes in about 30 seconds, for about $0.04 a
+video. API credit is billed separately from a Claude subscription, and $5 covers more
+than 100 videos. This is optional: everything else works without a key.
+
 ## Install (about 5 minutes)
 
-You need a Mac with Apple Silicon (M1 or later) and [Homebrew](https://brew.sh).
+You need:
+
+- a Mac with Apple Silicon (M1 or later)
+- [Homebrew](https://brew.sh)
+- [Claude Code](https://claude.com/claude-code) or Codex (the Codex app or the Codex
+  CLI), signed in
+
 Open **Terminal** and paste:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/adrienschaal/moodscroll/main/install.sh | bash
 ```
 
-The installer tells you what each step is for and asks before the optional ones. It:
+The installer explains each step and asks before the optional ones:
 
-1. Installs `uv` (manages Python for you) and `ffmpeg` (reads video) through Homebrew,
-   if you don't already have them.
-2. Downloads MOODscroll to `~/.local/share/moodscroll`.
-3. Downloads the speech-to-text model (about 1.6 GB, one time only).
-4. Asks for a Claude API key. You can skip this step; see "Which way should I use it?"
-   below.
-5. Adds **MOODscroll** to your Applications folder.
-6. Offers to connect MOODscroll to Claude Code and the Claude desktop app.
+1. It installs `uv` (manages Python for you) and `ffmpeg` (reads video) through
+   Homebrew, if you don't have them yet.
+2. It downloads MOODscroll to `~/.local/share/moodscroll`.
+3. It downloads the speech-to-text model (about 1.6 GB, one time only).
+4. It adds **MOODscroll** to your Applications folder.
+5. It connects MOODscroll to Claude Code and Codex, whichever you have.
+6. It offers to add a Claude API key, which you can skip.
 
-If Apple's Command Line Tools are missing, the installer opens Apple's own installer
-for them. Run MOODscroll's installer again once that finishes.
+**Then quit Claude Code or Codex completely (⌘Q) and reopen it**, so it loads
+MOODscroll.
 
-You can run the installer as often as you like. It skips whatever is already done, and
-it updates MOODscroll to the latest version.
+If Apple's Command Line Tools are missing, the installer opens Apple's installer for
+them. Run MOODscroll's installer again once that finishes. You can run it as often as
+you like: it skips whatever is already done and updates MOODscroll to the latest version.
 
 ## Use it
+
+### The app
 
 Open **MOODscroll**: press ⌘ Space, type `MOODscroll`, then press Return. It opens in
 your browser at `http://127.0.0.1:8765`, an address that works only on your own Mac.
 
 - **Paste a link** and click **Make notes**. Or drag a video file (mp4, mov, m4v, webm,
   mkv) onto the box.
-- You can watch each step as it runs. A one-minute video takes about 30 seconds.
 - **Open a note** to read it next to the video. Click any transcript line, key frame or
   piece of on-screen text to jump the video to that moment.
 - **Search** at the top looks through every note's title, summary, key points,
   transcript and on-screen text.
 - **Copy Markdown** puts the whole note on your clipboard, ready to paste into Notes,
   Obsidian or Notion.
-- To stop MOODscroll, click **Quit MOODscroll** at the bottom of the page.
+- **Quit MOODscroll** at the bottom of the page stops it.
 
-To keep it in your Dock, open it once, then drag MOODscroll from Applications onto the
+To keep MOODscroll in your Dock, open it once, then drag it from Applications onto the
 Dock.
 
-## Which way should I use it?
+### Claude Code and Codex
 
-There are three ways to use MOODscroll. All three run the same engine and save to the
-same library. What differs is who writes the notes:
+Talk to it the way you'd talk to a person:
 
-| | Who writes the notes | What it costs | Best for |
-|---|---|---|---|
-| **The app** | MOODscroll, through the Claude API | your API key, about $0.04 a video | dropping videos in and reading notes beside them |
-| **Inside Claude** (desktop app or Claude Code) | Claude, in your chat | your Claude plan covers it, no key needed | "make notes from this reel", "find that pasta recipe I saved" |
-| **Command line** | MOODscroll, through the Claude API | your API key | lots of videos at once, or scripts |
+| Say | What happens |
+|---|---|
+| *make notes from https://www.instagram.com/reel/…* | MOODscroll processes the video on your Mac, then the assistant writes and saves the note |
+| *finish my MOODscroll notes* | notes for every video waiting in the app |
+| *what was that BBQ pizza recipe I saved?* | searches your library and reads you the note |
+| *redo the notes for the gnocchi video, shorter* | rewrites a note you already have |
 
-**No API key?** The app and the command line still do the transcript, the frames and the
-on-screen text. Only the written notes need a key. You can get one at
-[platform.claude.com](https://platform.claude.com/settings/keys). Claude Pro and Max
-subscriptions don't include API credit, and $5 covers more than 100 videos. Then run the
-setup again to add the key:
+**Codex asks before it saves a note.** That's normal for any tool that writes files.
+Approve it. The tools only write inside your `~/Moodscroll` library.
 
-```bash
-cd ~/.local/share/moodscroll && uv run moodscroll-setup
-```
+If you use the Claude desktop app's chat, the installer connects it too.
 
-The key is saved in `~/.config/moodscroll/.env`, and only your user account can read
-that file.
-
-### Inside Claude
-
-If you let the installer connect it, quit Claude completely (⌘Q) and open it again.
-Then ask:
-
-> Make notes from https://www.instagram.com/reel/…
->
-> What was that BBQ pizza recipe I saved?
-
-Claude has your Mac download the video, transcribe it and read the on-screen text.
-Then Claude writes the note itself and saves it to your library, so you'll find it in
-the app afterwards.
-
-### Command line
+### Command line (optional)
 
 ```bash
 cd ~/.local/share/moodscroll
@@ -104,9 +122,12 @@ uv run moodscroll "https://www.instagram.com/reel/…" another.mp4
 
 | Option | What it does |
 |---|---|
-| `-o FOLDER` | save the notes somewhere other than `~/Moodscroll` |
-| `--no-notes` | skip the Claude step, so nothing leaves your Mac after the download |
-| `--keep-video` | keep the downloaded video next to the note |
+| `-o FOLDER` | saves somewhere other than `~/Moodscroll` |
+| `--no-notes` | skips the notes, so nothing leaves your Mac after the download |
+| `--keep-video` | keeps the downloaded video next to the note |
+
+Without an API key, the videos are left waiting for Claude Code or Codex, just as in
+the app.
 
 ## Where your notes live
 
@@ -121,23 +142,22 @@ Each video gets its own folder in `~/Moodscroll/`, for example
 
 To keep the library somewhere else, set `MOODSCROLL_DIR=/path/to/folder`.
 
-## What it does, and where
+## What runs where
 
-| Step | Where it runs | How |
+| Step | Where | How |
 |---|---|---|
 | Download | the internet | [yt-dlp](https://github.com/yt-dlp/yt-dlp), with Instagram's public embed page as a fallback. Or your own file. |
 | Speech to text | **your Mac** | Whisper large-v3-turbo on Apple Silicon ([mlx-whisper](https://github.com/ml-explore/mlx-examples)) |
 | Key frames | **your Mac** | ffmpeg: one frame at each scene change, and at least one every 8 seconds |
-| On-screen text | **your Mac** | Apple Vision, the same text recognition that Photos uses |
-| The written note | Claude | gets the transcript, the on-screen text, the caption and 4 frames |
+| On-screen text | **your Mac** | Apple Vision, the same text recognition Photos uses |
+| The written note | Claude Code, Codex, or the Claude API | gets the transcript, on-screen text, caption and 4 frames |
 
-**What leaves your Mac:** the last step sends the transcript, the on-screen text, the
-caption and four frames to Claude. They go through your API key, or through your Claude
-chat if you use MOODscroll inside Claude. The video itself is never uploaded. With
-`--no-notes`, nothing leaves your Mac after the download.
+**What leaves your Mac:** only the last step. It sends the transcript, the on-screen
+text, the caption and four frames, either to the assistant you're chatting with or to
+the Claude API if you added a key. The video itself is never uploaded.
 
-**Why the transcripts can be trusted:** Whisper tends to make up sentences over
-background music. MOODscroll drops a segment when:
+**Why the transcripts hold up:** Whisper tends to invent sentences over background
+music. MOODscroll drops a segment when:
 
 - it repeats itself
 - the model rated it very unlikely (real speech scores about −0.1 log-probability,
@@ -148,12 +168,13 @@ background music. MOODscroll drops a segment when:
 
 | Problem | Fix |
 |---|---|
-| The app opens a page that won't load | Wait a few seconds and reload. The first start is the slowest. If it still won't load, check `~/Library/Logs/MOODscroll.log`. |
+| Claude Code or Codex doesn't know about MOODscroll | Quit it with ⌘Q (closing the window isn't enough), then reopen it. In Claude Code, `/mcp` should list `moodscroll`. In Codex, run `codex mcp list`. |
+| It looks for files instead of using MOODscroll | Mention MOODscroll by name, as in *"finish my MOODscroll notes"* or *"use MOODscroll to make notes from …"*. |
+| The app opens a page that won't load | Wait a few seconds and reload, since the first start is the slowest. If it still won't load, check `~/Library/Logs/MOODscroll.log`. |
 | "Address already in use" | MOODscroll is already running. Open `http://127.0.0.1:8765`, or click **Quit MOODscroll** there and open the app again. |
-| A link won't download | The video may be private or deleted, or the creator may have turned off embedding. Save the video with the platform's own download button, then drop the file in. |
-| Notes say there's no API key | Add one with `uv run moodscroll-setup` (see above), or use MOODscroll inside Claude instead. |
-| Claude doesn't see MOODscroll | Quit Claude with ⌘Q (closing the window isn't enough), then reopen it. |
-| Anything else | Run the installer again. It fixes whatever is missing. |
+| A link won't download | The video may be private or deleted, or the creator may have turned off embedding. Save it with the platform's own download button, then drop the file in. |
+| Notes failed with an API error | Check your key and credit at platform.claude.com. The video stays waiting, so *"finish my MOODscroll notes"* still works. |
+| Anything else | Run the installer again. It repairs whatever is missing. |
 
 ## Uninstall
 
@@ -161,9 +182,8 @@ background music. MOODscroll drops a segment when:
 cd ~/.local/share/moodscroll && uv run moodscroll-setup --uninstall
 ```
 
-This removes the app and disconnects MOODscroll from Claude. Your notes
-(`~/Moodscroll`) and your key (`~/.config/moodscroll`) stay where they are. To remove
-everything else as well:
+This removes the app and disconnects MOODscroll from Claude Code and Codex. Your notes
+(`~/Moodscroll`) and your key (`~/.config/moodscroll`) stay. To remove everything else:
 
 ```bash
 rm -rf ~/.local/share/moodscroll ~/.config/moodscroll ~/.cache/moodscroll
@@ -177,27 +197,40 @@ git clone https://github.com/adrienschaal/moodscroll && cd moodscroll
 uv run pytest
 ```
 
-Where things are:
+| File | What it does |
+|---|---|
+| `pipeline.py` | runs the steps |
+| `sources.py` | downloads the video |
+| `media.py` | Whisper, ffmpeg and OCR |
+| `notes.py` | the note schema, the prompt, and the optional API call |
+| `render.py` | turns a note into Markdown |
+| `library.py` | search, and the list of videos waiting for notes |
+| `web.py`, `static/` | the app: a FastAPI server bound to 127.0.0.1 that refuses requests from other websites |
+| `mcp_server.py` | the Claude Code / Codex connection |
+| `cli.py` | the command line |
+| `setup_mac.py` | the second half of the installer |
 
-- `pipeline.py` runs the steps.
-- `sources.py` downloads the video.
-- `media.py` handles Whisper, ffmpeg and OCR.
-- `notes.py` holds the Claude prompt and the note schema.
-- `render.py` turns a note into Markdown.
-- `library.py` handles search.
-- The front ends:
-  - `web.py` and `static/` are the app: a FastAPI server bound to 127.0.0.1 that
-    refuses requests from other websites.
-  - `mcp_server.py` is the Claude connection.
-  - `cli.py` is the command line.
-  - `setup_mac.py` is the second half of the installer.
+The MCP server has six tools: `process_video`, `list_waiting`, `get_video`,
+`save_notes`, `search_notes` and `read_note`. It never calls an AI API itself. The
+assistant writes the notes and saves them with `save_notes`.
+
+To connect it by hand:
+
+```bash
+claude mcp add moodscroll --scope user -- uv --directory ~/.local/share/moodscroll run moodscroll-mcp
+codex mcp add moodscroll -- uv --directory ~/.local/share/moodscroll run moodscroll-mcp
+```
+
+For Codex, also add `tool_timeout_sec = 900` under `[mcp_servers.moodscroll]` in
+`~/.codex/config.toml`. Codex gives up on a tool after 60 seconds by default, and a long
+video takes longer than that.
 
 Environment variables:
 
 | Variable | Sets | Default |
 |---|---|---|
 | `MOODSCROLL_DIR` | where the library lives | `~/Moodscroll` |
-| `MOODSCROLL_MODEL` | the Claude model | `claude-opus-5-5` |
+| `MOODSCROLL_MODEL` | the Claude model, when using an API key | `claude-opus-5-5` |
 | `MOODSCROLL_EFFORT` | how hard Claude works on each note | `medium` |
 | `MOODSCROLL_WHISPER_MODEL` | the speech-to-text model | Whisper large-v3-turbo |
 

@@ -1,3 +1,4 @@
+import pytest
 from moodscroll.media import clean_segments, dedupe_ocr, subsample
 from moodscroll.notes import Detail, Notes
 from moodscroll.pipeline import slugify
@@ -57,5 +58,19 @@ def test_markdown_with_and_without_notes():
     assert "`1:05` Add the salt." in md and "](frames/0001.jpg)" in md
     assert "Claims to verify" not in md  # empty sections are left out
 
-    md = markdown({**meta, "notes_error": "no key"}, transcript, [], [], None)
-    assert "*No AI notes for this video: no key.*" in md
+    md = markdown({**meta, "notes_error": "Claude API key invalid"}, transcript, [], [], None)
+    assert "*Notes failed: Claude API key invalid. Waiting for notes." in md
+    assert "Waiting for notes. Ask Claude Code or Codex" in markdown(meta, transcript, [], [], None)
+
+
+def test_run_without_key_leaves_video_waiting(tmp_path, monkeypatch):
+    from moodscroll import pipeline
+
+    folder = tmp_path / "2026-11-03-v"
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    monkeypatch.setattr(pipeline, "extract", lambda *a, **k: folder)
+    monkeypatch.setattr(pipeline.notes, "make_notes", lambda *a: pytest.fail("must not call the API"))
+    messages = []
+    assert pipeline.run("x.mp4", tmp_path, progress=messages.append) == folder
+    assert "Waiting for notes" in messages[-1]
