@@ -1,0 +1,24 @@
+[project]
+name = "vnotes"
+version = "0.1.0"
+description = "Turn any video into notes, locally: Whisper on Apple Silicon, Apple Vision OCR, and Claude for the write-up."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=2.4.0",
+    "mlx-whisper>=0.4.3",
+    "pydantic>=2.14.2",
+    "yt-dlp>=2026.10.26",
+]
+
+[project.scripts]
+vnotes = "vnotes.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
