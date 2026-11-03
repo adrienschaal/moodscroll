@@ -44,3 +44,60 @@ def test_other_websites_are_refused(client):
     assert client.post("/api/jobs", data={"url": "https://x.com/v"}, headers={"origin": "https://evil.example"}).status_code == 403
     assert client.get("/api/library", headers={"host": "evil.example:8765"}).status_code == 403
     assert client.get("/api/library", headers={"origin": "http://127.0.0.1:8765"}).status_code == 200
+
+
+@pytest.fixture
+def key_files(tmp_path, monkeypatch):
+    """A fake key location, so tests never touch the real ~/.config/moodscroll."""
+    from moodscroll import keys
+    cfg = tmp_path / "config"
+    monkeypatch.setattr(keys, "KEY_FILE", cfg / ".env")
+    monkeypatch.setattr(keys, "KEY_OFF", cfg / ".env.off")
+    monkeypatch.setattr(web, "KEY_FILE", cfg / ".env")
+    for v in keys.ENV_VARS:
+        monkeypatch.delenv(v, raising=False)
+    checked = []
+    monkeypatch.setattr(keys.anthropic, "Anthropic", lambda api_key: checked.append(api_key) or _FakeClient(api_key))
+    return cfg, checked
+
+
+class _FakeClient:
+    def __init__(self, key):
+        import types
+        def list_(limit):
+            if key.endswith("bad"):
+                import httpx
+                from moodscroll.keys import anthropic
+                raise anthropic.AuthenticationError("bad", response=httpx.Response(401, request=httpx.Request("GET", "https://x")), body=None)
+        self.models = types.SimpleNamespace(list=list_)
+
+
+GOOD = "sk-ant-api03-" + "x" * 40
+POST = {"headers": {"Origin": "http://127.0.0.1:8765"}}
+
+
+def test_switch_between_assistant_and_api_key(client, key_files):
+    cfg, checked = key_files
+    assert client.get("/api/status").json()["mode"] == "assistant"
+
+    r = client.post("/api/key", json={"key": "hello"}, **POST)
+    assert r.status_code == 400 and "sk-ant-" in r.json()["detail"] and not checked
+    r = client.post("/api/key", json={"key": GOOD[:-3] + "bad"}, **POST)
+    assert r.status_code == 400 and "rejected" in r.json()["detail"]
+    assert not (cfg / ".env").exists()
+
+    r = client.post("/api/key", json={"key": GOOD}, **POST)
+    assert r.json()["mode"] == "api" and GOOD not in r.text  # never echoed back
+    assert (cfg / ".env").stat().st_mode & 0o777 == 0o600
+
+    r = client.post("/api/key/off", **POST).json()
+    assert r["mode"] == "assistant" and r["saved_key_off"] and not (cfg / ".env").exists()
+    assert client.post("/api/waiting/write", **POST).status_code == 400
+
+    assert client.post("/api/key/on", **POST).json()["mode"] == "api"
+    assert (cfg / ".env").read_text() == f"ANTHROPIC_API_KEY={GOOD}\n"
+
+
+def test_key_cannot_be_set_from_another_website(client, key_files):
+    r = client.post("/api/key", json={"key": GOOD}, headers={"Origin": "https://evil.example"})
+    assert r.status_code == 403 and not (key_files[0] / ".env").exists()

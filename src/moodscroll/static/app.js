@@ -76,23 +76,90 @@ let status = null;
 const askBox = (phrase) =>
   `<code>${esc(phrase)}</code> <button class="ghost small" data-copy="${esc(phrase)}">Copy</button>`;
 
+// Who writes the notes, and a switch between the two:
+//   assistant  Claude Code or Codex, on the user's subscription (no key)
+//   api        this app, with the user's Claude API key
+let keyFormOpen = false;
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
 async function loadStatus() {
   status = await api("/api/status");
   const box = $("#banner");
-  if (!box) return;
-  const waiting = status.waiting
-    ? `<span class="count">${status.waiting} video${status.waiting > 1 ? "s" : ""} waiting for notes.</span> ` : "";
-  if (!status.has_key) {
-    box.innerHTML = `<div class="banner">
-      <p><b>Your notes are written by Claude Code or Codex.</b> ${waiting}Add videos here
-      whenever you like, then tell Claude Code or Codex: ${askBox(status.ask_phrase)}</p>
-      <p class="fine">They appear here as soon as they're written. Prefer this app to write them by
-      itself? Run the installer again and add a Claude API key (about $0.04 a video).</p></div>`;
-  } else {
-    box.innerHTML = status.waiting
-      ? `<div class="banner"><p>${waiting}Tell Claude Code or Codex: ${askBox(status.ask_phrase)}</p></div>` : "";
-  }
+  if (!box || keyFormOpen) return;  // don't wipe a key being typed
+  box.innerHTML = status.mode === "api" ? apiBanner() : assistantBanner();
 }
+
+function assistantBanner() {
+  const waiting = status.waiting ? `<b>${plural(status.waiting, "video")} waiting for notes.</b> ` : "";
+  return `<div class="banner">
+    <p><b>Notes are written by Claude Code or Codex</b>, on your subscription. ${waiting}Add videos
+    here whenever you like, then tell Claude Code or Codex: ${askBox(status.ask_phrase)}</p>
+    <p class="fine">Want this app to write notes by itself?
+      <button class="link-btn" data-act="show-key">Use a Claude API key</button>${status.saved_key_off
+        ? ` or <button class="link-btn" data-act="key-on">turn your saved key back on</button>` : ""}</p>
+    <div id="key-box"></div></div>`;
+}
+
+function apiBanner() {
+  const n = status.waiting;
+  const waiting = n ? `<p>${plural(n, "video")} waiting for notes.
+      <button class="small" data-act="write-waiting">Write ${n === 1 ? "it" : "them"} now</button>
+      <span class="fine">about $${(0.04 * n).toFixed(2)}</span></p>` : "";
+  return `<div class="banner">
+    <p><b>Notes are written by this app</b>, with your Claude API key (about $0.04 a video).
+      <button class="link-btn" data-act="key-off">Switch to Claude Code / Codex</button></p>${waiting}</div>`;
+}
+
+function showKeyForm() {
+  keyFormOpen = true;
+  $("#key-box").innerHTML = `
+    <form id="key-form" class="key-form" autocomplete="off">
+      <input id="key" type="password" placeholder="sk-ant-…" spellcheck="false" autocomplete="off" required>
+      <button type="submit">Save key</button>
+      <button type="button" class="ghost" data-act="hide-key">Cancel</button>
+    </form>
+    <p class="fine">Get a key at <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com</a>.
+      API use is billed by Anthropic, separately from any Claude subscription; about $0.04 a video.
+      The key is checked with Anthropic, then saved only on this Mac. Switch back any time.</p>
+    <p class="fine error" id="key-msg"></p>`;
+  $("#key").focus();
+  $("#key-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector("button[type=submit]");
+    btn.disabled = true; btn.textContent = "Checking…";
+    try {
+      await api("/api/key", { method: "POST", headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ key: $("#key").value }) });
+      keyFormOpen = false;
+      loadStatus();
+    } catch (err) {
+      $("#key-msg").textContent = err.message;
+      btn.disabled = false; btn.textContent = "Save key";
+    }
+  });
+}
+
+document.addEventListener("click", async (e) => {
+  const el = e.target.closest("[data-act]");
+  if (!el) return;
+  const act = el.dataset.act;
+  e.preventDefault();
+  const post = (path) => api(path, { method: "POST" });
+  try {
+    if (act === "show-key") showKeyForm();
+    if (act === "hide-key") { keyFormOpen = false; loadStatus(); }
+    if (act === "key-on") { await post("/api/key/on"); keyFormOpen = false; loadStatus(); }
+    if (act === "key-off") { await post("/api/key/off"); keyFormOpen = false; loadStatus(); }
+    if (act === "write-waiting" || act === "write-this") {
+      const one = el.dataset.folder;
+      await post("/api/waiting/write" + (one ? `?folder=${encodeURIComponent(one)}` : ""));
+      if (one) el.replaceWith(Object.assign(document.createElement("span"), { textContent: "Writing notes…" }));
+      else { loadStatus(); pollJobs(); }
+    }
+  } catch (err) {
+    alert(err.message);
+  }
+});
 
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-copy]");
@@ -218,7 +285,8 @@ async function showNote(folder) {
           ${m.source?.startsWith("http") ? ` · <a href="${esc(m.source)}" target="_blank" rel="noopener">original</a>` : ""}</div>
         ${n ? `<p class="summary">${esc(n.summary)}</p>`
             : `<div class="banner"><p><b>Waiting for notes.</b>${m.notes_error ? ` (Notes failed: ${esc(m.notes_error)}.)` : ""}
-                Tell Claude Code or Codex: ${askBox(status?.ask_phrase || "finish my MOODscroll notes")}</p>
+                Tell Claude Code or Codex: ${askBox(status?.ask_phrase || "finish my MOODscroll notes")}${status?.mode === "api"
+                  ? ` or <button class="small" data-act="write-this" data-folder="${esc(d.folder)}">Write them now</button>` : ""}</p>
                 <p class="fine">This page updates by itself when they're written.</p></div>`}
         ${n ? section("Key points", list(n.key_points))
             + section("Details", n.details.length ? `<dl class="details">${n.details.map((x) =>

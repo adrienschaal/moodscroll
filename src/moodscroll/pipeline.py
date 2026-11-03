@@ -128,6 +128,12 @@ def run(src: str, out_root: Path, *, with_notes: bool = True, keep_video: bool =
     if not notes.has_key():
         progress(notes.WAITING_HINT)
         return folder
+    return write_notes(folder, progress=progress)
+
+
+def write_notes(folder: Path, *, progress: Callable[[str], None] = print) -> Path:
+    """Notes from the Claude API for a video already processed. On failure the
+    video stays waiting, with the reason saved. Returns the (renamed) folder."""
     data = load(folder)
     progress("writing notes with Claude...")
     t0 = time.monotonic()

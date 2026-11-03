@@ -25,8 +25,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-from . import KEY_FILE, library, notes, pipeline, sources
+from . import KEY_FILE, keys, library, notes, pipeline, sources
 from .media import ocr_lines, paragraphs
 
 STATIC = Path(__file__).parent / "static"
@@ -73,8 +74,11 @@ def _worker() -> None:
         job = jobs[job_id]
         _update(job_id, status="running", started=time.time())
         try:
-            folder = pipeline.run(job["input"], library.DEFAULT_ROOT, keep_video=True,
-                                  progress=lambda m: _update(job_id, step=m.strip()))
+            progress = lambda m: _update(job_id, step=m.strip())  # noqa: E731
+            if job.get("folder"):  # a video already processed, waiting for notes
+                folder = pipeline.write_notes(library.resolve_folder(job["folder"]), progress=progress)
+            else:
+                folder = pipeline.run(job["input"], library.DEFAULT_ROOT, keep_video=True, progress=progress)
             upload = job.get("upload")
             if upload:  # an uploaded file lives in a temp folder; keep it with its note
                 shutil.move(upload, folder / f"video{Path(upload).suffix.lower()}")
@@ -95,10 +99,10 @@ def _worker() -> None:
 threading.Thread(target=_worker, daemon=True).start()
 
 
-def _enqueue(label: str, input_: str, upload: str | None = None) -> dict:
+def _enqueue(label: str, input_: str | None, upload: str | None = None, folder: str | None = None) -> dict:
     job_id = uuid.uuid4().hex[:8]
     with _lock:
-        jobs[job_id] = {"id": job_id, "label": label, "input": input_, "upload": upload,
+        jobs[job_id] = {"id": job_id, "label": label, "input": input_, "upload": upload, "folder": folder,
                         "status": "queued", "step": None, "created": time.time()}
     _queue.put(job_id)
     return _public(jobs[job_id])
@@ -136,8 +140,59 @@ def list_jobs():
 @app.get("/api/status")
 def status():
     load_dotenv(KEY_FILE)  # moodscroll-setup may have added a key while the app runs
-    return {"has_key": notes.has_key(), "ask_phrase": notes.ASK_PHRASE,
-            "waiting": len(library.waiting())}
+    with _lock:  # don't count videos whose notes are already queued
+        queued = {j["folder"] for j in jobs.values() if j.get("folder") and j["status"] in ("queued", "running")}
+    waiting = [w for w in library.waiting() if w["folder"] not in queued]
+    return {**keys.status(), "has_key": keys.active(), "ask_phrase": notes.ASK_PHRASE,
+            "waiting": len(waiting)}
+
+
+# --- Who writes the notes: switch between Claude Code / Codex and an API key --------
+# The key arrives in a POST body from this page only (see only_this_app), is checked
+# with Anthropic, saved in ~/.config/moodscroll/.env, and never sent back.
+
+class KeyIn(BaseModel):
+    key: str
+
+
+@app.post("/api/key")
+def set_key(body: KeyIn):
+    try:
+        keys.check(body.key)
+    except keys.KeyProblem as e:
+        raise HTTPException(400, str(e))
+    keys.save(body.key)
+    return status()
+
+
+@app.post("/api/key/on")
+def key_on():
+    try:
+        keys.turn_on()
+    except keys.KeyProblem as e:
+        raise HTTPException(400, str(e))
+    return status()
+
+
+@app.post("/api/key/off")
+def key_off():
+    keys.turn_off()
+    return status()
+
+
+@app.post("/api/waiting/write")
+def write_waiting(folder: str | None = None):
+    """With a key on: queue notes for every video waiting for them (or just one)."""
+    if not keys.active():
+        raise HTTPException(400, "Turn on an API key first, or ask Claude Code or Codex.")
+    with _lock:
+        queued = {j["folder"] for j in jobs.values() if j.get("folder") and j["status"] in ("queued", "running")}
+    todo = [w for w in library.waiting() if w["folder"] not in queued]
+    if folder:
+        todo = [w for w in todo if w["folder"] == _folder(folder).name]
+    for w in todo:
+        _enqueue(w["title"] or w["folder"], None, folder=w["folder"])
+    return {"queued": len(todo)}
 
 
 # --- Library ------------------------------------------------------------------------

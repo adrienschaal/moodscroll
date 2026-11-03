@@ -16,7 +16,10 @@ def folders(root: Path | None = None) -> list[Path]:
     root = root or DEFAULT_ROOT
     if not root.is_dir():
         return []
-    return sorted((p for p in root.iterdir() if (p / "meta.json").exists()), reverse=True)
+    # Newest first: by the date in the name, then by when the folder was created
+    # (it keeps that time when renamed after its title).
+    return sorted((p for p in root.iterdir() if (p / "meta.json").exists()),
+                  key=lambda p: (p.name[:10], getattr(p.stat(), "st_birthtime", p.stat().st_mtime)), reverse=True)
 
 
 def resolve_folder(name: str, root: Path | None = None) -> Path:

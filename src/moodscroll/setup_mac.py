@@ -18,7 +18,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import KEY_FILE, library, media
+from . import KEY_FILE, keys, library, media
 from .notes import ASK_PHRASE
 
 REPO = Path(__file__).resolve().parents[2]
@@ -96,13 +96,12 @@ def api_key(yes: bool) -> None:
     say("5/5  Claude API key (optional)")
     note("Not needed if you use Claude Code or Codex: they write the notes on your subscription.")
     note("With a key, the MOODscroll app also writes notes by itself, about $0.04 a video.")
-    import anthropic
-
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        done(f"already set ({KEY_FILE if KEY_FILE.exists() else 'environment'})")
+    note("You can switch between the two any time, in the app.")
+    if keys.active():
+        done(f"already on ({KEY_FILE if KEY_FILE.exists() else 'environment'})")
         return
     if yes:
-        note("skipped; run the installer again any time to add one")
+        note("skipped")
         return
     note("Create one at https://platform.claude.com/settings/keys")
     key = getpass.getpass("  Paste it here (typing is hidden), or press Enter to skip: ").strip()
@@ -110,22 +109,12 @@ def api_key(yes: bool) -> None:
         note("skipped; videos you add in the app wait for Claude Code or Codex to write their notes")
         return
     try:
-        anthropic.Anthropic(api_key=key).models.list(limit=1)
-    except anthropic.AuthenticationError:
-        note("that key was rejected; nothing saved. Run moodscroll-setup again to retry.")
+        keys.check(key)
+    except keys.KeyProblem as e:
+        note(f"{e} Nothing saved; you can add a key later in the app.")
         return
-    except anthropic.APIConnectionError:
-        note("couldn't reach Anthropic to check it; saving it anyway")
-    save_key(key)
+    keys.save(key)
     done(f"saved to {KEY_FILE} (readable only by you)")
-
-
-def save_key(key: str) -> None:
-    KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(KEY_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
-        f.write(f"ANTHROPIC_API_KEY={key}\n")
-    os.environ["ANTHROPIC_API_KEY"] = key
 
 
 def mac_app(yes: bool) -> None:

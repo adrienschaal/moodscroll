@@ -40,10 +40,19 @@ Two ways to add a video:
    Claude Code or Codex *"finish my MOODscroll notes"*. It writes the note for every
    waiting video, and the app fills in by itself.
 
-**Prefer the app to write the notes by itself?** Add a Claude API key during install.
-Then videos you add in the app get their notes in about 30 seconds, for about $0.04 a
-video. API credit is billed separately from a Claude subscription, and $5 covers more
-than 100 videos. This is optional: everything else works without a key.
+**Prefer the app to write the notes by itself?** Click **Use a Claude API key** in
+the app and paste a key from [platform.claude.com](https://platform.claude.com/settings/keys).
+After that, videos you add in the app get their notes in about 30 seconds, for about
+$0.04 a video, and any videos already waiting get a **Write them now** button.
+
+**Switch to Claude Code / Codex** turns the key off again without deleting it, so you
+can switch back with one click. API credit is billed separately from a Claude
+subscription, and $5 covers more than 100 videos. All of this is optional: everything
+else works without a key.
+
+The key is checked with Anthropic, then saved only on your Mac, in
+`~/.config/moodscroll/.env`, which only your user account can read. It is never shown
+again or sent anywhere else.
 
 ## Install (about 5 minutes)
 
@@ -68,7 +77,7 @@ The installer explains each step and asks before the optional ones:
 3. It downloads the speech-to-text model (about 1.6 GB, one time only).
 4. It adds **MOODscroll** to your Applications folder.
 5. It connects MOODscroll to Claude Code and Codex, whichever you have.
-6. It offers to add a Claude API key, which you can skip.
+6. It offers to add a Claude API key. You can skip this and add one later in the app.
 
 **Then quit Claude Code or Codex completely (⌘Q) and reopen it**, so it loads
 MOODscroll.
@@ -173,7 +182,8 @@ music. MOODscroll drops a segment when:
 | The app opens a page that won't load | Wait a few seconds and reload, since the first start is the slowest. If it still won't load, check `~/Library/Logs/MOODscroll.log`. |
 | "Address already in use" | MOODscroll is already running. Open `http://127.0.0.1:8765`, or click **Quit MOODscroll** there and open the app again. |
 | A link won't download | The video may be private or deleted, or the creator may have turned off embedding. Save it with the platform's own download button, then drop the file in. |
-| Notes failed with an API error | Check your key and credit at platform.claude.com. The video stays waiting, so *"finish my MOODscroll notes"* still works. |
+| Notes failed with an API error | Check your key and credit at platform.claude.com. The video stays waiting: click **Write them now** to retry, or say *"finish my MOODscroll notes"* in Claude Code or Codex. |
+| A note looks out of date, or a fix doesn't show | After updating MOODscroll, quit Claude Code or Codex (⌘Q) and reopen it. They keep running the version that was there when they started. |
 | Anything else | Run the installer again. It repairs whatever is missing. |
 
 ## Uninstall
@@ -205,6 +215,7 @@ uv run pytest
 | `notes.py` | the note schema, the prompt, and the optional API call |
 | `render.py` | turns a note into Markdown |
 | `library.py` | search, and the list of videos waiting for notes |
+| `keys.py` | the optional API key: check, save, switch off and on |
 | `web.py`, `static/` | the app: a FastAPI server bound to 127.0.0.1 that refuses requests from other websites |
 | `mcp_server.py` | the Claude Code / Codex connection |
 | `cli.py` | the command line |

@@ -57,7 +57,8 @@ WAITING_HINT = f'Waiting for notes. Ask Claude Code or Codex to "{ASK_PHRASE}".'
 def has_key() -> bool:
     """Whether this Mac can write notes itself (through the Claude API). Without a
     key, videos wait in the library until Claude Code or Codex writes their notes."""
-    return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+    from .keys import active
+    return active()
 
 
 def _frame_block(path: Path) -> dict:
