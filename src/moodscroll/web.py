@@ -27,6 +27,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import KEY_FILE, library, notes, pipeline, sources
+from .media import ocr_lines, paragraphs
 
 STATIC = Path(__file__).parent / "static"
 VIDEO_TYPES = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
@@ -45,7 +46,11 @@ async def only_this_app(request, call_next):
     if request.headers.get("host") not in ALLOWED_HOSTS or (
             origin and origin.removeprefix("http://") not in ALLOWED_HOSTS):
         return JSONResponse({"detail": "forbidden"}, status_code=403)
-    return await call_next(request)
+    response = await call_next(request)
+    if not request.url.path.startswith("/media/"):
+        # After an update, the browser must fetch the new app.js, not a cached one.
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 # --- Jobs ---------------------------------------------------------------------------
@@ -160,7 +165,8 @@ def get_note(name: str):
         "folder": folder.name,
         "meta": d["meta"],
         "transcript": d["transcript"],
-        "ocr": d["ocr"],
+        "paragraphs": paragraphs(d["transcript"]["segments"]),
+        "ocr": [{"t": o["t"], "lines": ocr_lines(o)} for o in d["ocr"]],
         "frames": d["frames"],
         "notes": d["notes"].model_dump() if d["notes"] else None,
         "video": f"/media/{folder.name}/{video}" if video else None,

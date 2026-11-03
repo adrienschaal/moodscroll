@@ -66,7 +66,8 @@ def extract(src: str, out_root: Path, *, keep_video: bool = False,
         source.meta["duration_s"] = source.meta.get("duration_s") or media.duration(source.video)
         transcript = step("transcribing", media.transcribe, source.video)
         frames = step("finding key frames", media.keyframes, source.video, work / "frames")
-        screen_text = step("reading on-screen text", media.ocr, work / "frames", frames)
+        spoken = " ".join(s["text"] for s in transcript["segments"])
+        screen_text = step("reading on-screen text", media.ocr, work / "frames", frames, spoken)
 
         out = _unique_dir(out_root, f"{date.today().isoformat()}-{slugify(source.meta.get('title') or 'video')}")
         out.mkdir()

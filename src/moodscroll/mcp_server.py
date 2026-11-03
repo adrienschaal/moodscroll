@@ -80,7 +80,7 @@ async def process_video(source: str, ctx: Context) -> list:
 
     try:
         folder = await anyio.to_thread.run_sync(
-            lambda: pipeline.extract(source, library.DEFAULT_ROOT, progress=progress))
+            lambda: pipeline.extract(source, library.DEFAULT_ROOT, keep_video=True, progress=progress))
     except Exception as e:  # tell the assistant what went wrong instead of a bare crash
         raise ToolError(f"could not process {source}: {e}") from e
     return _material(folder)

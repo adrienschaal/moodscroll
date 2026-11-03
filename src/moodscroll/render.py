@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import json
 
+from .media import ocr_lines, paragraphs
 from .notes import WAITING_HINT, Notes
+
+LONG_SCREEN = 6  # more on-screen lines than this is a whole screen, not a title
 
 
 def _ts(seconds: float) -> str:
@@ -57,10 +60,19 @@ def markdown(meta: dict, transcript: dict, ocr: list[dict], frames: list[dict], 
         out += ["## Key frames", ""]
         out += [f"![{_ts(f['t'])}](frames/{f['file']})" for f in frames] + [""]
     if ocr:
-        out += ["## On-screen text"] + [f"- `{_ts(o['t'])}` {o['text']}" for o in ocr] + [""]
-    out += ["## Transcript"]
+        out += ["## On-screen text"]
+        for o in ocr:
+            lines = ocr_lines(o)
+            if len(lines) <= LONG_SCREEN:
+                out.append(f"- `{_ts(o['t'])}` " + " / ".join(lines))
+            else:  # a whole screen (a web page, an app): list it under one entry
+                out.append(f"- `{_ts(o['t'])}` *{len(lines)} lines on screen*")
+                out += [f"  - {line}" for line in lines]
+        out.append("")
+    out += ["## Transcript", ""]
     if transcript["segments"]:
-        out += [f"`{_ts(s['start'])}` {s['text']}  " for s in transcript["segments"]]
+        for para in paragraphs(transcript["segments"]):
+            out += [f"`{_ts(para[0]['start'])}` " + " ".join(s["text"].strip() for s in para), ""]
     else:
         out += ["(no speech)"]
     return "\n".join(out) + "\n"

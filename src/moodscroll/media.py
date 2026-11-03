@@ -120,9 +120,9 @@ def _swift_binary(name: str) -> Path:
     return exe
 
 
-def ocr(frames_dir: Path, frames: list[dict]) -> list[dict]:
-    """Returns [{"t": 3.2, "text": "..."}] with lines already seen on earlier
-    frames removed (burned-in subtitles repeat across many frames)."""
+def ocr(frames_dir: Path, frames: list[dict], spoken: str = "") -> list[dict]:
+    """Returns [{"t": 3.2, "lines": [...], "text": "a / b"}]: the text on screen
+    that isn't just the speech again. See clean_ocr."""
     if not frames:
         return []
     r = subprocess.run([str(_swift_binary("ocr")), str(frames_dir)],
@@ -131,20 +131,61 @@ def ocr(frames_dir: Path, frames: list[dict]) -> list[dict]:
     for line in r.stdout.splitlines():
         rec = json.loads(line)
         by_file[rec["file"]] = rec["lines"]
-    return dedupe_ocr([(f["t"], by_file.get(f["file"], [])) for f in frames])
+    return clean_ocr([(f["t"], by_file.get(f["file"], [])) for f in frames], spoken)
 
 
-def dedupe_ocr(frames: list[tuple[float, list[str]]]) -> list[dict]:
+def _words(text: str) -> list[str]:
+    return [w.strip("'") for w in re.findall(r"[a-z0-9']+", text.lower()) if w.strip("'")]
+
+
+def clean_ocr(frames: list[tuple[float, list[str]]], spoken: str = "") -> list[dict]:
+    """Keeps only on-screen text worth reading. Drops:
+    - lines already seen on an earlier frame (text stays on screen across frames);
+    - burned-in subtitles: lines whose words are nearly all in the transcript
+      (they only repeat the speech, cut into fragments);
+    - scraps with no word of 3+ characters ("on", "24", "|")."""
+    spoken_words = set(_words(spoken))
     seen: set[str] = set()
     out = []
     for t, lines in frames:
         new = []
         for line in lines:
-            key = " ".join(line.lower().split())
-            if len(key) < 2 or key in seen:
+            line = " ".join(line.split())
+            words = _words(line)
+            key = " ".join(words)
+            if not key or key in seen:
                 continue
             seen.add(key)
-            new.append(line.strip())
+            if not any(len(w) >= 3 for w in words):
+                continue
+            if spoken_words and sum(w in spoken_words for w in words) / len(words) >= 0.75:
+                continue
+            new.append(line)
         if new:
-            out.append({"t": t, "text": " | ".join(new)})
+            out.append({"t": t, "lines": new, "text": " / ".join(new)})
+    return out
+
+
+def ocr_lines(item: dict) -> list[str]:
+    """The lines of one on-screen text entry (older notes stored them joined by |)."""
+    return item.get("lines") or item["text"].split(" | ")
+
+
+def paragraphs(segments: list[dict], target: int = 160, gap: float = 1.5) -> list[list[dict]]:
+    """Groups Whisper's short segments into readable paragraphs: a new one starts
+    after a finished sentence once the paragraph is long enough, after a pause, or
+    when it gets too long. Each segment keeps its own timestamp."""
+    out: list[list[dict]] = []
+    size = 0
+    for s in segments:
+        if out:
+            prev = out[-1][-1]
+            sentence_done = prev["text"].rstrip().endswith((".", "?", "!", "…"))
+            if (sentence_done and size >= target) or s["start"] - prev["end"] > gap or size > 2.5 * target:
+                out.append([])
+                size = 0
+        else:
+            out.append([])
+        out[-1].append(s)
+        size += len(s["text"])
     return out

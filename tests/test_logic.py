@@ -1,5 +1,5 @@
 import pytest
-from moodscroll.media import clean_segments, dedupe_ocr, subsample
+from moodscroll.media import clean_ocr, clean_segments, ocr_lines, paragraphs, subsample
 from moodscroll.notes import Detail, Notes
 from moodscroll.pipeline import slugify
 from moodscroll.render import markdown
@@ -21,9 +21,27 @@ def test_clean_segments_drops_made_up_text():
     assert clean_segments(segments, video_duration=92.9) == [{"start": 0, "end": 2, "text": "Real speech."}]
 
 
-def test_dedupe_ocr_skips_repeated_subtitles():
+def test_clean_ocr_drops_repeats_scraps_and_subtitles():
     frames = [(0.0, ["Hello world", "SALE"]), (2.0, ["hello  WORLD", "New line"]), (4.0, ["SALE"])]
-    assert dedupe_ocr(frames) == [{"t": 0.0, "text": "Hello world | SALE"}, {"t": 2.0, "text": "New line"}]
+    assert clean_ocr(frames) == [{"t": 0.0, "lines": ["Hello world", "SALE"], "text": "Hello world / SALE"},
+                                 {"t": 2.0, "lines": ["New line"], "text": "New line"}]
+
+    # From a real reel: burned-in captions repeat the speech in fragments.
+    spoken = ("I'm going to show you how to do the same exact thing. They all use these little things "
+              "called NFC stickers. You can program them to do things.")
+    frames = [(2.6, ["I'm gonna show you how", "to"]), (5.7, ["they all use these little", "things"]),
+              (12.6, ["Fogos", "program them to do", "Cancel"]), (13.0, ["24", "|"])]
+    assert clean_ocr(frames, spoken) == [{"t": 12.6, "lines": ["Fogos", "Cancel"], "text": "Fogos / Cancel"}]
+    assert ocr_lines({"t": 0, "text": "old | format"}) == ["old", "format"]
+
+
+def test_paragraphs_join_short_segments():
+    segs = [{"start": 0, "end": 2, "text": "Don't ever spend money on app blocking devices."},
+            {"start": 2.6, "end": 5.5, "text": "I'm going to show you how to do the same exact thing at a fraction of the price."},
+            {"start": 5.7, "end": 8.1, "text": "They all use these little things called NFC stickers,"},
+            {"start": 8.3, "end": 10.6, "text": "and you can buy a roll of 50 for like eight bucks."},
+            {"start": 14, "end": 15, "text": "After a pause."}]
+    assert [[s["start"] for s in p] for p in paragraphs(segs)] == [[0, 2.6, 5.7, 8.3], [14]]
 
 
 def test_subsample_keeps_ends_and_count():

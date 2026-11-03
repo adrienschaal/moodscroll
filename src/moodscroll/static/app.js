@@ -228,12 +228,13 @@ async function showNote(folder) {
         <div class="actions">
           <button class="ghost" id="copy">Copy Markdown</button>
         </div>
-        ${section("Transcript", d.transcript.segments.length
-          ? d.transcript.segments.map((s) =>
-              `<div class="line" data-start="${s.start}" data-end="${s.end}"><button class="ts" data-t="${s.start}">${ts(s.start)}</button>${esc(s.text)}</div>`).join("")
+        ${section("Transcript", d.paragraphs.length
+          ? d.paragraphs.map((p) => `<p class="para"><button class="ts" data-t="${p[0].start}">${ts(p[0].start)}</button>${
+              p.map((s) => `<span class="seg" data-t="${s.start}" data-start="${s.start}" data-end="${s.end}">${esc(s.text.trim())}</span>`).join(" ")}</p>`).join("")
           : `<p class="caption">(no speech)</p>`)}
-        ${section("On-screen text", d.ocr.map((o) =>
-          `<div class="line"><button class="ts" data-t="${o.t}">${ts(o.t)}</button>${esc(o.text)}</div>`).join(""))}
+        ${section("On-screen text", d.ocr.map((o) => o.lines.length <= 6
+          ? `<div class="line"><button class="ts" data-t="${o.t}">${ts(o.t)}</button><div class="ocr">${o.lines.map(esc).join("<br>")}</div></div>`
+          : `<div class="line"><button class="ts" data-t="${o.t}">${ts(o.t)}</button><details class="ocr"><summary>${esc(o.lines[0])} <span class="more">· ${o.lines.length} lines on screen</span></summary>${o.lines.slice(1).map(esc).join("<br>")}</details></div>`).join(""))}
         ${m.caption ? `<h3>Caption</h3><details><summary>Show the original caption</summary><p class="caption">${esc(m.caption)}</p></details>` : ""}
       </article>
     </div>`;
@@ -242,6 +243,7 @@ async function showNote(folder) {
   const player = $("#player");
   // onclick (not addEventListener) so opening another note replaces the handler.
   view.onclick = (e) => {
+    if (e.target.closest("summary")) return;  // opening a folded screen, not seeking
     const t = e.target.closest("[data-t]")?.dataset.t;
     if (t === undefined || !player) return;
     player.currentTime = Number(t);
@@ -249,7 +251,7 @@ async function showNote(folder) {
   };
   // Highlight the transcript line being spoken.
   if (player) {
-    const lines = [...view.querySelectorAll(".line[data-start]")];
+    const lines = [...view.querySelectorAll(".seg")];
     player.addEventListener("timeupdate", () => {
       const now = player.currentTime;
       lines.forEach((l) => l.classList.toggle("now", now >= l.dataset.start && now < l.dataset.end));
