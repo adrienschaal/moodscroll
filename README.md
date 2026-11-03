@@ -32,7 +32,8 @@ invented lines about -5), or that start after the video ends.
 | **MCP server** in Claude Desktop or Claude Code | Claude, in your conversation | your Claude plan, no API key | asking Claude "make notes from this reel", "find that pasta recipe I saved" |
 | **Command line** | vnotes, through the Claude API | API key, a few cents a video | batches, scripts, running unattended |
 
-Either way, add `--no-notes` (CLI) or skip `save_notes` (MCP) and nothing leaves your Mac.
+In MCP mode the transcript, on-screen text and four frames go to Claude as part of your
+conversation. With the CLI's `--no-notes`, nothing leaves your Mac after the download.
 
 ## Install
 
