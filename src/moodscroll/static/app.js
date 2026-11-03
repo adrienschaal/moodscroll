@@ -157,7 +157,7 @@ document.addEventListener("click", async (e) => {
       menu.hidden = !menu.hidden;
     }
     if (act === "delete-note") {
-      if (!confirm(`Delete “${el.dataset.title}”?\n\nIt moves to the Trash, so you can still put it back from there.`)) return;
+      if (!confirm(`Delete “${el.dataset.title}”?\n\nIt moves to the Trash. To restore it, drag it from the Trash back into your Moodscroll folder.`)) return;
       await api(`/api/notes/${encodeURIComponent(el.dataset.folder)}`, { method: "DELETE" });
       loadLibrary(); loadStatus();
     }

@@ -100,8 +100,8 @@ your browser at `http://127.0.0.1:8765`, an address that works only on your own 
   piece of on-screen text to jump the video to that moment.
 - **Search** at the top looks through every note's title, summary, key points,
   transcript and on-screen text.
-- **⋮** on a tile, then **Delete**, moves that note to the Trash (Finder's Put Back
-  restores it).
+- **⋮** on a tile, then **Delete**, moves that note's folder to the Trash. To restore
+  it, drag it from the Trash back into `~/Moodscroll`.
 - **Copy Markdown** puts the whole note on your clipboard, ready to paste into Notes,
   Obsidian or Notion.
 - **Quit MOODscroll** at the bottom of the page stops it.

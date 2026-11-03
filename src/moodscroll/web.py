@@ -235,7 +235,7 @@ TRASH = Path.home() / ".Trash"
 
 @app.delete("/api/notes/{name}")
 def delete_note(name: str):
-    """Moves the note's folder to the Trash (Finder's Put Back undoes it)."""
+    """Moves the note's folder to the Trash; dragging it back into the library restores it."""
     folder = _folder(name)
     with _lock:
         if any(j.get("folder") == folder.name and j["status"] in ("queued", "running") for j in jobs.values()):
