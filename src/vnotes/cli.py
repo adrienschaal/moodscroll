@@ -6,7 +6,14 @@ import argparse
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from . import library, pipeline, sources
+
+# The API key lives in a private file, never in the code: ./.env when run from the
+# repo, or ~/.config/vnotes/.env when installed. Real environment variables win.
+load_dotenv(Path.cwd() / ".env")
+load_dotenv(Path.home() / ".config" / "vnotes" / ".env")
 
 DEFAULT_OUT = library.DEFAULT_ROOT
 
