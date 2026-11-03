@@ -2,11 +2,17 @@
 
     <out>/<date>-<slug>/
         note.md          the readable result
-        notes.json       Claude's structured notes
+        notes.json       the structured notes (once written)
         meta.json        source, author, caption, duration, timings
         transcript.json  timestamped speech
         ocr.json         timestamped on-screen text
+        frames.json      which frame was taken when
         frames/          key frames (one per scene change)
+
+Two steps, so the notes can come from either place:
+  extract()    everything local: fetch, transcribe, frames, OCR
+  add_notes()  attach notes, from the Claude API (CLI, web app) or from Claude
+               itself through the MCP server (your Claude subscription)
 """
 
 from __future__ import annotations
@@ -22,6 +28,7 @@ from pathlib import Path
 from typing import Callable
 
 from . import media, notes, render, sources
+from .notes import Notes
 
 
 def slugify(text: str, max_len: int = 50) -> str:
@@ -37,8 +44,8 @@ def _unique_dir(root: Path, name: str) -> Path:
     return path
 
 
-def run(src: str, out_root: Path, *, with_notes: bool = True, keep_video: bool = False,
-        progress: Callable[[str], None] = print) -> Path:
+def extract(src: str, out_root: Path, *, keep_video: bool = False,
+            progress: Callable[[str], None] = print) -> Path:
     sources.require_ffmpeg()
     out_root.mkdir(parents=True, exist_ok=True)
     timings: dict[str, float] = {}
@@ -58,30 +65,79 @@ def run(src: str, out_root: Path, *, with_notes: bool = True, keep_video: bool =
         frames = step("finding key frames", media.keyframes, source.video, work / "frames")
         screen_text = step("reading on-screen text", media.ocr, work / "frames", frames)
 
-        result, usage, error = None, None, None
-        if with_notes:
-            try:
-                result, usage = step("writing notes with Claude", notes.make_notes,
-                                     source.meta, transcript, screen_text, work / "frames", frames)
-            except notes.NotesUnavailable as e:
-                error = str(e)
-                progress(f"  skipped notes: {error}")
-
-        title = (result.title if result else None) or source.meta.get("title") or "video"
-        out = _unique_dir(out_root, f"{date.today().isoformat()}-{slugify(title)}")
+        out = _unique_dir(out_root, f"{date.today().isoformat()}-{slugify(source.meta.get('title') or 'video')}")
         out.mkdir()
         shutil.move(str(work / "frames"), out / "frames")
         if keep_video and source.downloaded:  # never touch a file the user gave us
             shutil.move(str(source.video), out / source.video.name)
 
-        meta = {**source.meta, "timings_s": timings, "claude": usage, "notes_error": error}
-        _write_json(out / "meta.json", meta)
-        _write_json(out / "transcript.json", transcript)
-        _write_json(out / "ocr.json", screen_text)
-        if result:
-            _write_json(out / "notes.json", result.model_dump())
-        (out / "note.md").write_text(render.markdown(meta, transcript, screen_text, frames, result))
+    _write_json(out / "meta.json", {**source.meta, "timings_s": timings})
+    _write_json(out / "transcript.json", transcript)
+    _write_json(out / "ocr.json", screen_text)
+    _write_json(out / "frames.json", frames)
+    _render(out)
     return out
+
+
+def load(folder: Path) -> dict:
+    """Reads back everything extract() and add_notes() wrote."""
+    def read(name, default=None):
+        path = folder / name
+        return json.loads(path.read_text()) if path.exists() else default
+
+    raw = read("notes.json")
+    return {
+        "meta": read("meta.json", {}),
+        "transcript": read("transcript.json", {"language": None, "segments": []}),
+        "ocr": read("ocr.json", []),
+        "frames": read("frames.json", []),
+        "notes": Notes.model_validate(raw) if raw else None,
+    }
+
+
+def add_notes(folder: Path, result: Notes, usage: dict | None = None) -> Path:
+    """Saves the notes, re-renders note.md, and renames the folder after the notes'
+    title (creators' own titles are often 'Video by someone'). Returns the folder."""
+    _write_json(folder / "notes.json", result.model_dump())
+    meta = load(folder)["meta"]
+    meta.update(claude=usage, notes_error=None)
+    _write_json(folder / "meta.json", meta)
+
+    date_prefix = folder.name[:10]
+    wanted = f"{date_prefix}-{slugify(result.title)}"
+    if not folder.name.startswith(wanted):
+        target = _unique_dir(folder.parent, wanted)
+        folder.rename(target)
+        folder = target
+    _render(folder)
+    return folder
+
+
+def run(src: str, out_root: Path, *, with_notes: bool = True, keep_video: bool = False,
+        progress: Callable[[str], None] = print) -> Path:
+    """The whole thing in one go, with notes from the Claude API."""
+    folder = extract(src, out_root, keep_video=keep_video, progress=progress)
+    if not with_notes:
+        return folder
+    data = load(folder)
+    progress("writing notes with Claude...")
+    t0 = time.monotonic()
+    try:
+        result, usage = notes.make_notes(data["meta"], data["transcript"], data["ocr"],
+                                         folder / "frames", data["frames"])
+    except notes.NotesUnavailable as e:
+        progress(f"  skipped notes: {e}")
+        meta = {**data["meta"], "notes_error": str(e)}
+        _write_json(folder / "meta.json", meta)
+        _render(folder)
+        return folder
+    usage["seconds"] = round(time.monotonic() - t0, 1)
+    return add_notes(folder, result, usage)
+
+
+def _render(folder: Path) -> None:
+    d = load(folder)
+    (folder / "note.md").write_text(render.markdown(d["meta"], d["transcript"], d["ocr"], d["frames"], d["notes"]))
 
 
 def _write_json(path: Path, data) -> None:

@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
-from . import pipeline, sources
+from . import library, pipeline, sources
 
-DEFAULT_OUT = Path(os.environ.get("VNOTES_DIR", "~/vnotes")).expanduser()
+DEFAULT_OUT = library.DEFAULT_ROOT
 
 
 def main(argv: list[str] | None = None) -> int:
