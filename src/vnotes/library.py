@@ -12,15 +12,17 @@ from .pipeline import load
 DEFAULT_ROOT = Path(os.environ.get("VNOTES_DIR", "~/vnotes")).expanduser()
 
 
-def folders(root: Path = DEFAULT_ROOT) -> list[Path]:
+def folders(root: Path | None = None) -> list[Path]:
+    root = root or DEFAULT_ROOT
     if not root.is_dir():
         return []
     return sorted((p for p in root.iterdir() if (p / "meta.json").exists()), reverse=True)
 
 
-def resolve_folder(name: str, root: Path = DEFAULT_ROOT) -> Path:
+def resolve_folder(name: str, root: Path | None = None) -> Path:
     """Turns a folder name from search results into a path, refusing anything that
     would point outside the library (a tool argument is untrusted input)."""
+    root = root or DEFAULT_ROOT
     path = (root / name).resolve()
     if path.parent != root.resolve() or not (path / "meta.json").exists():
         raise ValueError(f"no video folder named {name!r} in {root}")
@@ -38,11 +40,13 @@ def summary(folder: Path) -> dict:
         "tags": n.tags if n else [],
         "summary": n.summary if n else None,
         "source": m.get("source"),
+        "duration_s": m.get("duration_s"),
+        "thumb": d["frames"][0]["file"] if d["frames"] else None,
         "has_notes": n is not None,
     }
 
 
-def search(query: str, root: Path = DEFAULT_ROOT, limit: int = 10) -> list[dict]:
+def search(query: str, root: Path | None = None, limit: int = 10) -> list[dict]:
     """Ranks videos by how many query words they contain, weighting the title,
     tags and summary above the caption and transcript."""
     words = [w for w in re.findall(r"\w+", query.lower()) if len(w) > 1]

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>vnotes</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a href="#/" class="brand">vnotes</a>
+    <input id="search" type="search" placeholder="Search everything you've saved" autocomplete="off">
+  </header>
+
+  <main id="view"></main>
+
+  <template id="home">
+    <section class="add" id="drop">
+      <form id="add-form">
+        <input id="url" type="url" placeholder="Paste a link — Instagram, TikTok, YouTube…" required>
+        <button type="submit">Make notes</button>
+      </form>
+      <p class="hint">or drop a video file anywhere on this box ·
+        <label class="link">choose a file<input id="file" type="file" accept="video/*" hidden></label></p>
+    </section>
+    <section id="jobs"></section>
+    <section>
+      <div class="row">
+        <h2 id="lib-title">Library</h2>
+        <div id="cats" class="chips"></div>
+      </div>
+      <div id="library" class="grid"></div>
+    </section>
+  </template>
+
+  <script src="/app.js"></script>
+</body>
+</html>
