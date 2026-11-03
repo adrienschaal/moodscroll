@@ -43,7 +43,8 @@ Two ways to add a video:
 **Prefer the app to write the notes by itself?** Click **Use a Claude API key** in
 the app and paste a key from [platform.claude.com](https://platform.claude.com/settings/keys).
 After that, videos you add in the app get their notes in about 30 seconds, for about
-$0.04 a video, and any videos already waiting get a **Write them now** button.
+$0.04 for a one-minute video (a 5-minute one is about $0.07), and any videos already
+waiting get a **Write them now** button showing what they'll cost.
 
 **Switch to Claude Code / Codex** turns the key off again without deleting it, so you
 can switch back with one click. API credit is billed separately from a Claude
@@ -99,6 +100,8 @@ your browser at `http://127.0.0.1:8765`, an address that works only on your own 
   piece of on-screen text to jump the video to that moment.
 - **Search** at the top looks through every note's title, summary, key points,
   transcript and on-screen text.
+- **⋮** on a tile, then **Delete**, moves that note to the Trash (Finder's Put Back
+  restores it).
 - **Copy Markdown** puts the whole note on your clipboard, ready to paste into Notes,
   Obsidian or Notion.
 - **Quit MOODscroll** at the bottom of the page stops it.

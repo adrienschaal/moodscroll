@@ -39,8 +39,17 @@ def resolve_folder(name: str, root: Path | None = None) -> Path:
 
 
 def waiting(root: Path | None = None) -> list[dict]:
-    """Videos that were processed but have no notes yet, oldest first."""
-    return [summary(f) for f in reversed(folders(root)) if not (f / "notes.json").exists()]
+    """Videos that were processed but have no notes yet, oldest first, each with
+    what writing its notes through the API should cost."""
+    from .notes import estimate_cost
+
+    out = []
+    for f in reversed(folders(root)):
+        if (f / "notes.json").exists():
+            continue
+        d = load(f)
+        out.append(summary(f) | {"est_cost": estimate_cost(d["meta"], d["transcript"], d["ocr"])})
+    return out
 
 
 def summary(folder: Path) -> dict:

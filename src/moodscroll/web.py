@@ -144,7 +144,7 @@ def status():
         queued = {j["folder"] for j in jobs.values() if j.get("folder") and j["status"] in ("queued", "running")}
     waiting = [w for w in library.waiting() if w["folder"] not in queued]
     return {**keys.status(), "has_key": keys.active(), "ask_phrase": notes.ASK_PHRASE,
-            "waiting": len(waiting)}
+            "waiting": len(waiting), "waiting_cost": round(sum(w["est_cost"] for w in waiting), 4)}
 
 
 # --- Who writes the notes: switch between Claude Code / Codex and an API key --------
@@ -225,8 +225,29 @@ def get_note(name: str):
         "frames": d["frames"],
         "notes": d["notes"].model_dump() if d["notes"] else None,
         "video": f"/media/{folder.name}/{video}" if video else None,
+        "est_cost": None if d["notes"] else notes.estimate_cost(d["meta"], d["transcript"], d["ocr"]),
         "markdown": (folder / "note.md").read_text(),
     }
+
+
+TRASH = Path.home() / ".Trash"
+
+
+@app.delete("/api/notes/{name}")
+def delete_note(name: str):
+    """Moves the note's folder to the Trash (Finder's Put Back undoes it)."""
+    folder = _folder(name)
+    with _lock:
+        if any(j.get("folder") == folder.name and j["status"] in ("queued", "running") for j in jobs.values()):
+            raise HTTPException(409, "Notes are being written for this video. Try again when they're done.")
+    TRASH.mkdir(exist_ok=True)
+    target = TRASH / folder.name
+    n = 2
+    while target.exists():
+        target = TRASH / f"{folder.name} {n}"
+        n += 1
+    shutil.move(str(folder), target)
+    return {"trashed": folder.name}
 
 
 @app.get("/media/{name}/{path:path}")

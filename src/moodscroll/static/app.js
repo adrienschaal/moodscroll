@@ -66,7 +66,7 @@ function showHome() {
   // Notes written in Claude Code or Codex land in the same library: while anything
   // is waiting, check every few seconds so they appear without a reload.
   liveTimer = setInterval(() => {
-    if (status?.waiting && !document.hidden) { loadStatus(); loadLibrary(); }
+    if (status?.waiting && !document.hidden && !$(".menu:not([hidden])")) { loadStatus(); loadLibrary(); }
   }, 4000);
 }
 
@@ -81,6 +81,7 @@ const askBox = (phrase) =>
 //   api        this app, with the user's Claude API key
 let keyFormOpen = false;
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const money = (usd) => (usd < 0.01 ? "under $0.01" : `$${usd.toFixed(2)}`);
 
 async function loadStatus() {
   status = await api("/api/status");
@@ -104,9 +105,9 @@ function apiBanner() {
   const n = status.waiting;
   const waiting = n ? `<p>${plural(n, "video")} waiting for notes.
       <button class="small" data-act="write-waiting">Write ${n === 1 ? "it" : "them"} now</button>
-      <span class="fine">about $${(0.04 * n).toFixed(2)}</span></p>` : "";
+      <span class="fine">about ${money(status.waiting_cost)}, based on each video's length</span></p>` : "";
   return `<div class="banner">
-    <p><b>Notes are written by this app</b>, with your Claude API key (about $0.04 a video).
+    <p><b>Notes are written by this app</b>, with your Claude API key (about $0.04 for a short video).
       <button class="link-btn" data-act="key-off">Switch to Claude Code / Codex</button></p>${waiting}</div>`;
 }
 
@@ -139,13 +140,27 @@ function showKeyForm() {
   });
 }
 
+const closeMenus = (except) =>
+  document.querySelectorAll(".menu:not([hidden])").forEach((m) => { if (m !== except) m.hidden = true; });
+
 document.addEventListener("click", async (e) => {
   const el = e.target.closest("[data-act]");
+  if (!el || !el.dataset.act.startsWith("card-")) closeMenus();
   if (!el) return;
   const act = el.dataset.act;
   e.preventDefault();
   const post = (path) => api(path, { method: "POST" });
   try {
+    if (act === "card-menu") {
+      const menu = el.nextElementSibling;
+      closeMenus(menu);
+      menu.hidden = !menu.hidden;
+    }
+    if (act === "delete-note") {
+      if (!confirm(`Delete “${el.dataset.title}”?\n\nIt moves to the Trash, so you can still put it back from there.`)) return;
+      await api(`/api/notes/${encodeURIComponent(el.dataset.folder)}`, { method: "DELETE" });
+      loadLibrary(); loadStatus();
+    }
     if (act === "show-key") showKeyForm();
     if (act === "hide-key") { keyFormOpen = false; loadStatus(); }
     if (act === "key-on") { await post("/api/key/on"); keyFormOpen = false; loadStatus(); }
@@ -234,14 +249,20 @@ async function loadLibrary() {
 
   const shown = items.filter((i) => !category || i.category === category);
   grid.innerHTML = shown.length ? shown.map((i) => `
-    <a class="card" href="#/note/${encodeURIComponent(i.folder)}">
-      <div class="thumb" style="background-image:url('${i.thumb ? `/media/${encodeURIComponent(i.folder)}/frames/${i.thumb}` : ""}')"></div>
-      <div class="body">
-        ${i.has_notes ? "" : '<span class="badge">Waiting for notes</span>'}
-        <div class="title">${esc(i.title || i.folder)}</div>
-        <div class="sub">${esc([i.author, i.category].filter(Boolean).join(" · "))}</div>
+    <div class="card">
+      <a class="card-link" href="#/note/${encodeURIComponent(i.folder)}">
+        <div class="thumb" style="background-image:url('${i.thumb ? `/media/${encodeURIComponent(i.folder)}/frames/${i.thumb}` : ""}')"></div>
+        <div class="body">
+          ${i.has_notes ? "" : '<span class="badge">Waiting for notes</span>'}
+          <div class="title">${esc(i.title || i.folder)}</div>
+          <div class="sub">${esc([i.author, i.category].filter(Boolean).join(" · "))}</div>
+        </div>
+      </a>
+      <button class="more" data-act="card-menu" aria-label="More actions" title="More">⋮</button>
+      <div class="menu" hidden>
+        <button data-act="delete-note" data-folder="${esc(i.folder)}" data-title="${esc(i.title || i.folder)}">Delete</button>
       </div>
-    </a>`).join("")
+    </div>`).join("")
     : `<p class="empty">${q ? "Nothing matches." : "Nothing here yet — paste a link above."}</p>`;
 }
 
@@ -286,7 +307,8 @@ async function showNote(folder) {
         ${n ? `<p class="summary">${esc(n.summary)}</p>`
             : `<div class="banner"><p><b>Waiting for notes.</b>${m.notes_error ? ` (Notes failed: ${esc(m.notes_error)}.)` : ""}
                 Tell Claude Code or Codex: ${askBox(status?.ask_phrase || "finish my MOODscroll notes")}${status?.mode === "api"
-                  ? ` or <button class="small" data-act="write-this" data-folder="${esc(d.folder)}">Write them now</button>` : ""}</p>
+                  ? ` or <button class="small" data-act="write-this" data-folder="${esc(d.folder)}">Write them now</button>
+                      <span class="fine">about ${money(d.est_cost)}</span>` : ""}</p>
                 <p class="fine">This page updates by itself when they're written.</p></div>`}
         ${n ? section("Key points", list(n.key_points))
             + section("Details", n.details.length ? `<dl class="details">${n.details.map((x) =>

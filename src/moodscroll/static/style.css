@@ -80,7 +80,9 @@ button.ghost { background: transparent; color: var(--accent); border: 1px solid 
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
   overflow: hidden; color: inherit; display: flex; flex-direction: column;
 }
-.card:hover { text-decoration: none; border-color: var(--accent); }
+.card:hover { border-color: var(--accent); }
+.card-link { color: inherit; display: flex; flex-direction: column; flex: 1; }
+.card-link:hover { text-decoration: none; }
 .thumb { aspect-ratio: 4 / 5; background: var(--line) center / cover no-repeat; }
 .card .body { padding: 10px 12px 12px; }
 .card .title { font-weight: 600; margin-bottom: 4px; }
@@ -167,3 +169,22 @@ button.small { padding: 2px 10px; font-size: .8rem; vertical-align: 1px; }
 .error, .banner .error { color: var(--bad); }
 .error:empty { display: none; }
 button:disabled { opacity: .6; cursor: default; }
+
+/* ⋮ menu on each library tile */
+.card .body { padding-right: 36px; }
+.more {
+  position: absolute; right: 6px; bottom: 6px; width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: 6px; background: none; color: var(--muted);
+  font-size: 1.1rem; line-height: 1; cursor: pointer;
+}
+.more:hover, .more:focus-visible { background: var(--line); color: inherit; }
+.menu {
+  position: absolute; right: 6px; bottom: 38px; z-index: 5; min-width: 120px; padding: 4px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / .18);
+}
+.menu button {
+  display: block; width: 100%; text-align: left; padding: 6px 10px; border: 0; border-radius: 5px;
+  background: none; color: var(--bad); font: inherit; cursor: pointer;
+}
+.menu button:hover { background: var(--line); }

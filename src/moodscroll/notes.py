@@ -81,6 +81,31 @@ def build_prompt(meta: dict, transcript: dict, ocr: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
+# $ per million tokens (input, output), from Anthropic's price list.
+PRICES = {
+    "claude-opus-5-5": (4.00, 20.00),
+    "claude-sonnet-5-5": (2.00, 10.00),
+    "claude-haiku-5-5": (0.10, 0.50),
+}
+
+
+def cost(input_tokens: int, output_tokens: int, model: str = MODEL) -> float:
+    price_in, price_out = PRICES.get(model, PRICES["claude-opus-5-5"])
+    return (input_tokens * price_in + output_tokens * price_out) / 1_000_000
+
+
+def estimate_cost(meta: dict, transcript: dict, ocr: list[dict]) -> float:
+    """What writing this video's notes through the API should cost, before sending.
+    Fitted on real calls (Opus 5.5, effort medium): about 6,000 tokens of fixed
+    overhead (instructions, note schema, 4 key frames) plus ~1 token per 2.5
+    characters of transcript, caption and on-screen text; the notes themselves
+    run 400-2,500 tokens and grow with the material. Rounded up 10%."""
+    chars = len(build_prompt(meta, transcript, ocr))
+    tokens_in = 6000 + chars / 2.5
+    tokens_out = min(2500, 400 + chars / 8)
+    return round(cost(tokens_in, tokens_out) * 1.1, 4)
+
+
 def make_notes(meta: dict, transcript: dict, ocr: list[dict], frames_dir: Path, frames: list[dict]) -> tuple[Notes, dict]:
     """Returns the notes and a small usage record (model, tokens) for the log."""
     try:

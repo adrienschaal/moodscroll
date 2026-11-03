@@ -95,7 +95,7 @@ def ocr_helper() -> None:
 def api_key(yes: bool) -> None:
     say("5/5  Claude API key (optional)")
     note("Not needed if you use Claude Code or Codex: they write the notes on your subscription.")
-    note("With a key, the MOODscroll app also writes notes by itself, about $0.04 a video.")
+    note("With a key, the MOODscroll app also writes notes by itself, about $0.04 for a one-minute video.")
     note("You can switch between the two any time, in the app.")
     if keys.active():
         done(f"already on ({KEY_FILE if KEY_FILE.exists() else 'environment'})")

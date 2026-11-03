@@ -101,3 +101,13 @@ def test_switch_between_assistant_and_api_key(client, key_files):
 def test_key_cannot_be_set_from_another_website(client, key_files):
     r = client.post("/api/key", json={"key": GOOD}, headers={"Origin": "https://evil.example"})
     assert r.status_code == 403 and not (key_files[0] / ".env").exists()
+
+
+def test_delete_moves_to_trash(client, tmp_path, monkeypatch):
+    trash = tmp_path.parent / (tmp_path.name + "-trash")
+    monkeypatch.setattr(web, "TRASH", trash)
+    assert client.delete("/api/notes/%2E%2E").status_code in (404, 405)
+    assert client.delete("/api/notes/secret.txt").status_code == 404
+    assert client.delete("/api/notes/2026-11-03-clip").json() == {"trashed": "2026-11-03-clip"}
+    assert (trash / "2026-11-03-clip" / "note.md").exists() and client.get("/api/library").json() == []
+    assert (tmp_path / "secret.txt").exists()

@@ -147,7 +147,9 @@ def write_notes(folder: Path, *, progress: Callable[[str], None] = print) -> Pat
         _render(folder)
         return folder
     usage["seconds"] = round(time.monotonic() - t0, 1)
-    progress(f"  {usage['input_tokens']:,} tokens in, {usage['output_tokens']:,} out, {usage['seconds']} s")
+    usage["cost_usd"] = round(notes.cost(usage["input_tokens"], usage["output_tokens"], usage["model"]), 4)
+    progress(f"  {usage['input_tokens']:,} tokens in, {usage['output_tokens']:,} out, "
+             f"${usage['cost_usd']:.3f}, {usage['seconds']} s")
     return add_notes(folder, result, usage)
 
 
