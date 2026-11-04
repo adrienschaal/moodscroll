@@ -5,3 +5,6 @@ __pycache__/
 .env
 moodscroll-out/
 .DS_Store
+
+# The demo script names private paths; the slide is public
+demo/script.md
