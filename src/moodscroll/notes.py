@@ -10,11 +10,13 @@ from pathlib import Path
 import anthropic
 from pydantic import BaseModel, Field
 
-from .media import subsample
+from .media import is_photos, place, subsample
 
 MODEL = os.environ.get("MOODSCROLL_MODEL", "claude-opus-5-5")
 EFFORT = os.environ.get("MOODSCROLL_EFFORT", "medium")
 FRAMES_FOR_CLAUDE = 4
+PICTURES_FOR_CLAUDE = 10  # a carousel's pictures are the content, so more of them
+TOKENS_PER_IMAGE = 1200  # about, for a picture or frame sent to Claude
 
 CATEGORIES = [
     "recipe", "travel", "fitness", "health", "money", "career", "tech", "business",
@@ -39,7 +41,7 @@ class Notes(BaseModel):
     worth_keeping: bool = Field(description="false for memes, ads and reactions with nothing reusable")
 
 
-SYSTEM = """You turn short videos into notes someone will reread months later.
+SYSTEM = """You turn short videos and photo posts into notes someone will reread months later.
 Keep the substance: the method, the quantities, the names, the places. Drop the hook,
 the call to action and the filler. Write what the creator claims as their claim
 ("argues", "says"), not as fact. If the transcript and the on-screen text disagree,
@@ -50,7 +52,7 @@ class NotesUnavailable(Exception):
     pass
 
 
-ASK_PHRASE = "finish my MOODscroll notes"
+ASK_PHRASE = "finish my MooDscroll notes"
 WAITING_HINT = f'Waiting for notes. Ask Claude Code or Codex to "{ASK_PHRASE}".'
 
 
@@ -68,6 +70,18 @@ def _frame_block(path: Path) -> dict:
 
 def build_prompt(meta: dict, transcript: dict, ocr: list[dict]) -> str:
     lines = [f"[{s['start']:.0f}s] {s['text']}" for s in transcript["segments"]]
+    if is_photos(meta):
+        screen = [f"[{place(meta, o['t'])}] {o['text']}" for o in ocr]
+        parts = [
+            f"A photo post: {meta.get('slides') or 1} picture(s), no video.",
+            f"Source: {meta.get('site') or 'local file'}",
+            f"Author: {meta.get('author') or 'unknown'}",
+            f"Caption:\n{meta.get('caption') or 'none'}",
+            "Text in the pictures (read by OCR):\n" + ("\n".join(screen) or "(none)"),
+        ]
+        if meta.get("alt_text"):
+            parts.append("Instagram's description of the pictures:\n" + "\n".join(meta["alt_text"]))
+        return "\n\n".join(parts)
     screen = [f"[{o['t']:.0f}s] {o['text']}" for o in ocr]
     parts = [
         f"Source: {meta.get('site') or 'local file'}",
@@ -101,9 +115,14 @@ def estimate_cost(meta: dict, transcript: dict, ocr: list[dict]) -> float:
     characters of transcript, caption and on-screen text; the notes themselves
     run 400-2,500 tokens and grow with the material. Rounded up 10%."""
     chars = len(build_prompt(meta, transcript, ocr))
-    tokens_in = 6000 + chars / 2.5
+    extra_images = max(0, images_for_claude(meta) - FRAMES_FOR_CLAUDE)
+    tokens_in = 6000 + extra_images * TOKENS_PER_IMAGE + chars / 2.5
     tokens_out = min(2500, 400 + chars / 8)
     return round(cost(tokens_in, tokens_out) * 1.1, 4)
+
+
+def images_for_claude(meta: dict) -> int:
+    return min(meta.get("slides") or 1, PICTURES_FOR_CLAUDE) if is_photos(meta) else FRAMES_FOR_CLAUDE
 
 
 def make_notes(meta: dict, transcript: dict, ocr: list[dict], frames_dir: Path, frames: list[dict]) -> tuple[Notes, dict]:
@@ -113,7 +132,7 @@ def make_notes(meta: dict, transcript: dict, ocr: list[dict], frames_dir: Path, 
     except anthropic.AnthropicError as e:  # no credentials configured
         raise NotesUnavailable(str(e)) from e
 
-    content = [_frame_block(frames_dir / f["file"]) for f in subsample(frames, FRAMES_FOR_CLAUDE)]
+    content = [_frame_block(frames_dir / f["file"]) for f in subsample(frames, images_for_claude(meta))]
     content.append({"type": "text", "text": build_prompt(meta, transcript, ocr)})
 
     try:

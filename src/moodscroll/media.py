@@ -98,6 +98,34 @@ def keyframes(video: Path, outdir: Path, threshold: float = 0.3, every: float = 
     return keep
 
 
+def slides(images: list[Path], outdir: Path) -> list[dict]:
+    """A photo post's pictures as frames: 0001.jpg, 0002.jpg... with "t" the slide
+    number (1, 2...), so everything that lists frames by time lists them by slide.
+    Converted to JPEG at most 1440 px wide: big enough for small text to read well."""
+    outdir.mkdir(parents=True, exist_ok=True)
+    frames = []
+    for n, img in enumerate(images, 1):
+        out = outdir / f"{n:04d}.jpg"
+        r = subprocess.run(["sips", "-s", "format", "jpeg", "-Z", "1440", str(img), "--out", str(out)],
+                           capture_output=True, text=True)
+        if r.returncode != 0 or not out.exists():
+            raise RuntimeError(f"couldn't read picture {n}: {r.stderr[-300:]}")
+        frames.append({"file": out.name, "t": n})
+    return frames
+
+
+def place(meta: dict, t: float) -> str:
+    """Where something is in the post: "1:05" in a video, "slide 3" in a photo post."""
+    if is_photos(meta):
+        return f"slide {int(t)}"
+    m, s = divmod(int(t), 60)
+    return f"{m}:{s:02d}"
+
+
+def is_photos(meta: dict) -> bool:
+    return meta.get("kind") in ("photo", "carousel")
+
+
 def subsample(items: list, n: int) -> list:
     """Keeps n items spread evenly, always including the first and the last."""
     if len(items) <= n:

@@ -5,6 +5,10 @@ const view = $("#view");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const ts = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+// What a library tile says it is. A photo post's frames are its pictures, numbered by slide.
+const KINDS = { reel: "Reel", video: "Video", photo: "Photo", carousel: "Carousel" };
+const kindLabel = (i) => i.kind === "carousel" && i.slides ? `Carousel · ${i.slides}` : KINDS[i.kind] || "Video";
+const isPhotos = (m) => m.kind === "photo" || m.kind === "carousel";
 
 async function api(path, opts) {
   const r = await fetch(path, opts);
@@ -39,7 +43,7 @@ $("#search").addEventListener("input", () => {
 
 function showHome() {
   view.onclick = null;
-  document.title = "MOODscroll";
+  document.title = "MooDscroll";
   view.replaceChildren($("#home").content.cloneNode(true));
   $("#add-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -92,7 +96,7 @@ async function loadStatus() {
 }
 
 function assistantBanner() {
-  const waiting = status.waiting ? `<b>${plural(status.waiting, "video")} waiting for notes.</b> ` : "";
+  const waiting = status.waiting ? `<b>${plural(status.waiting, "post")} waiting for notes.</b> ` : "";
   return `<div class="banner">
     <p><b>Notes are written by Claude Code or Codex</b>, on your subscription. ${waiting}Add videos
     here whenever you like, then tell Claude Code or Codex: ${askBox(status.ask_phrase)}</p>
@@ -104,7 +108,7 @@ function assistantBanner() {
 
 function apiBanner() {
   const n = status.waiting;
-  const waiting = n ? `<p>${plural(n, "video")} waiting for notes.
+  const waiting = n ? `<p>${plural(n, "post")} waiting for notes.
       <button class="small" data-act="write-waiting">Write ${n === 1 ? "it" : "them"} now</button>
       <span class="fine">about ${money(status.waiting_cost)}, based on each video's length</span></p>` : "";
   return `<div class="banner">
@@ -240,7 +244,7 @@ function importRow(id, list) {
   const left = count("queued") + count("running");
   const running = list.find((j) => j.status === "running") || list.find((j) => j.status === "queued" && j.step);
   const total = list.length - count("cancelled");
-  const bits = [skipped && `${skipped} skipped (photos)`, failed && `${failed} failed`,
+  const bits = [skipped && `${skipped} skipped`, failed && `${failed} failed`,
                 count("cancelled") && `${count("cancelled")} stopped`].filter(Boolean).join(" · ");
   const problems = list.filter((j) => j.status === "failed");
   return `<div class="job import-job">
@@ -278,7 +282,8 @@ async function loadLibrary() {
   grid.innerHTML = shown.length ? shown.map((i) => `
     <div class="card">
       <a class="card-link" href="#/note/${encodeURIComponent(i.folder)}">
-        <div class="thumb" style="background-image:url('${i.thumb ? `/media/${encodeURIComponent(i.folder)}/frames/${i.thumb}` : ""}')"></div>
+        <div class="thumb" style="background-image:url('${i.thumb ? `/media/${encodeURIComponent(i.folder)}/frames/${i.thumb}` : ""}')">
+          <span class="kind kind-${esc(i.kind || "video")}">${esc(kindLabel(i))}</span></div>
         <div class="body">
           ${i.has_notes ? "" : '<span class="badge">Waiting for notes</span>'}
           <div class="title">${esc(i.title || i.folder)}</div>
@@ -311,7 +316,9 @@ async function showNote(folder) {
   const n = d.notes, m = d.meta;
   const frameUrl = (f) => `/media/${encodeURIComponent(d.folder)}/frames/${f.file}`;
   const title = n?.title || m.title || d.folder;
-  document.title = `${title} · MOODscroll`;
+  const photos = isPhotos(m);
+  const at = (t) => (photos ? `${t}` : ts(t));  // a slide number, or a time in the video
+  document.title = `${title} · MooDscroll`;
 
   const list = (items, tag = "ul", cls = "") =>
     items?.length ? `<${tag} class="${cls}">${items.map((x) => `<li>${esc(x)}</li>`).join("")}</${tag}>` : "";
@@ -321,19 +328,20 @@ async function showNote(folder) {
     <p><a href="#/">← Library</a></p>
     <div class="note">
       <aside class="side">
-        ${d.video
+        ${d.video && !photos
           ? `<video id="player" src="${d.video}" controls playsinline preload="metadata"></video>`
-          : d.frames[0] ? `<img class="poster" src="${frameUrl(d.frames[0])}" alt="">` : ""}
-        <div class="frames">${d.frames.map((f) =>
-          `<button data-t="${f.t}" title="Jump to ${ts(f.t)}"><img src="${frameUrl(f)}" alt="" loading="lazy"><span>${ts(f.t)}</span></button>`).join("")}</div>
+          : d.frames[0] ? `<img class="poster" id="slide" src="${frameUrl(d.frames[0])}" alt="">` : ""}
+        ${photos && d.frames.length < 2 ? "" : `<div class="frames">${d.frames.map((f, k) =>
+          `<button data-t="${f.t}" class="${photos && k === 0 ? "on" : ""}" title="${photos ? `Picture ${f.t}` : `Jump to ${ts(f.t)}`}"><img src="${frameUrl(f)}" alt="" loading="lazy"><span>${at(f.t)}</span></button>`).join("")}</div>`}
       </aside>
       <article>
         <h1>${esc(title)}</h1>
-        <div class="meta">${esc([m.author, m.site, m.duration_s && ts(m.duration_s)].filter(Boolean).join(" · "))}
+        <div class="meta">${esc([kindLabel(m),
+          m.author, m.site, !photos && m.duration_s && ts(m.duration_s)].filter(Boolean).join(" · "))}
           ${m.source?.startsWith("http") ? ` · <a href="${esc(m.source)}" target="_blank" rel="noopener">original</a>` : ""}</div>
         ${n ? `<p class="summary">${esc(n.summary)}</p>`
             : `<div class="banner"><p><b>Waiting for notes.</b>${m.notes_error ? ` (Notes failed: ${esc(m.notes_error)}.)` : ""}
-                Tell Claude Code or Codex: ${askBox(status?.ask_phrase || "finish my MOODscroll notes")}${status?.mode === "api"
+                Tell Claude Code or Codex: ${askBox(status?.ask_phrase || "finish my MooDscroll notes")}${status?.mode === "api"
                   ? ` or <button class="small" data-act="write-this" data-folder="${esc(d.folder)}">Write them now</button>
                       <span class="fine">about ${money(d.est_cost)}</span>` : ""}</p>
                 <p class="fine">This page updates by itself when they're written.</p></div>`}
@@ -345,13 +353,14 @@ async function showNote(folder) {
         <div class="actions">
           <button class="ghost" id="copy">Copy Markdown</button>
         </div>
-        ${section("Transcript", d.paragraphs.length
+        ${photos ? "" : section("Transcript", d.paragraphs.length
           ? d.paragraphs.map((p) => `<p class="para"><button class="ts" data-t="${p[0].start}">${ts(p[0].start)}</button>${
               p.map((s) => `<span class="seg" data-t="${s.start}" data-start="${s.start}" data-end="${s.end}">${esc(s.text.trim())}</span>`).join(" ")}</p>`).join("")
           : `<p class="caption">(no speech)</p>`)}
-        ${section("On-screen text", d.ocr.map((o) => o.lines.length <= 6
-          ? `<div class="line"><button class="ts" data-t="${o.t}">${ts(o.t)}</button><div class="ocr">${o.lines.map(esc).join("<br>")}</div></div>`
-          : `<div class="line"><button class="ts" data-t="${o.t}">${ts(o.t)}</button><details class="ocr"><summary>${esc(o.lines[0])} <span class="more">· ${o.lines.length} lines on screen</span></summary>${o.lines.slice(1).map(esc).join("<br>")}</details></div>`).join(""))}
+        ${section(photos ? "Text in the pictures" : "On-screen text", d.ocr.map((o) => o.lines.length <= (photos ? 20 : 6)
+          ? `<div class="line"><button class="ts" data-t="${o.t}">${at(o.t)}</button><div class="ocr">${o.lines.map(esc).join("<br>")}</div></div>`
+          : `<div class="line"><button class="ts" data-t="${o.t}">${at(o.t)}</button><details class="ocr"><summary>${esc(o.lines[0])} <span class="count">· ${o.lines.length} lines${photos ? "" : " on screen"}</span></summary>${o.lines.slice(1).map(esc).join("<br>")}</details></div>`).join(""))}
+        ${photos && m.alt_text?.length ? section("Instagram's description of the pictures", list(m.alt_text)) : ""}
         ${m.caption ? `<h3>Caption</h3><details><summary>Show the original caption</summary><p class="caption">${esc(m.caption)}</p></details>` : ""}
       </article>
     </div>`;
@@ -362,6 +371,13 @@ async function showNote(folder) {
   view.onclick = (e) => {
     if (e.target.closest("summary")) return;  // opening a folded screen, not seeking
     const t = e.target.closest("[data-t]")?.dataset.t;
+    if (t !== undefined && photos) {  // show that picture
+      const f = d.frames.find((x) => String(x.t) === t);
+      if (f) $("#slide").src = frameUrl(f);
+      view.querySelectorAll(".frames button").forEach((b) => b.classList.toggle("on", b.dataset.t === t));
+      $("#slide").scrollIntoView({ block: "nearest", behavior: "smooth" });
+      return;
+    }
     if (t === undefined || !player) return;
     player.currentTime = Number(t);
     player.play();
@@ -390,9 +406,9 @@ async function showNote(folder) {
 
 $("#quit").addEventListener("click", async (e) => {
   e.preventDefault();
-  if (!confirm("Quit MOODscroll? Videos still processing will stop.")) return;
+  if (!confirm("Quit MooDscroll? Videos still processing will stop.")) return;
   await fetch("/api/quit", { method: "POST" }).catch(() => {});
-  document.body.innerHTML = '<main><p class="empty">MOODscroll has quit. Open it again from Applications or Spotlight.</p></main>';
+  document.body.innerHTML = '<main><p class="empty">MooDscroll has quit. Open it again from Applications or Spotlight.</p></main>';
 });
 
 
@@ -405,18 +421,18 @@ const picked = new Set();  // shortcodes ticked for import
 
 function showImport() {
   view.onclick = null;
-  document.title = "Import saved posts · MOODscroll";
+  document.title = "Import saved posts · MooDscroll";
   found = null; picked.clear(); shownCollection = null;
   if (!status) loadStatus().catch(() => {});
   view.innerHTML = `<section class="import">
     <p><a href="#/">← Library</a></p>
     <h1>Import your Instagram saved posts</h1>
     <p class="lead">Instagram can send you a file that lists everything you've saved. Drop it here, pick
-      the posts you want, and MOODscroll turns them into notes. It never logs in to your account.</p>
+      the posts you want, and MooDscroll turns them into notes. It never logs in to your account.</p>
 
     <h2>1. Ask Instagram for the file <span class="fine">(2 minutes, once)</span></h2>
     <ol class="steps">
-      <li>In the Instagram app, go to your profile, tap <b>☰</b>, then <b>Accounts Center</b>.</li>
+      <li>In the Instagram app, go to your profile, tap <b>☰</b>, then <b>Meta Account</b>.</li>
       <li>Tap <b>Your information and permissions</b> → <b>Export your information</b> → <b>Create export</b>.
         <span class="fine">(Some versions say Download your information.)</span></li>
       <li>Choose your Instagram profile, then <b>Export to device</b>.</li>
@@ -520,7 +536,7 @@ function renderImport() {
   $("#imp-list").innerHTML = `
     <h2>3. Pick what to import</h2>
     <p>Found <b>${plural(all, "saved post")}</b>${have ? `; ${have} already in your library` : ""}.
-      Photo posts are skipped automatically: only videos become notes.</p>
+      Reels, videos, photos and carousels all come in; for pictures, the text in them is read.</p>
     ${chips}
     <p class="imp-tools fine">Select:
       <button class="link-btn" data-sel="20">newest 20</button> ·
@@ -544,7 +560,7 @@ function importFooter() {
     <span class="fine">About ${minutes} min on this Mac. You can keep using it meanwhile, and stop any time.</span>
     ${api_ ? `<label class="fine imp-notes"><input type="checkbox" id="imp-notes" ${withNotes ? "checked" : ""}>
         Also write the notes now with my API key (about ${money(0.042 * n)})</label>`
-      : `<p class="fine">They'll wait for notes. Then tell Claude Code or Codex: ${askBox(status?.ask_phrase || "finish my MOODscroll notes")}
+      : `<p class="fine">They'll wait for notes. Then tell Claude Code or Codex: ${askBox(status?.ask_phrase || "finish my MooDscroll notes")}
         Each note uses some of your subscription, so batches of 20 to 50 work best.</p>`}`;
 }
 

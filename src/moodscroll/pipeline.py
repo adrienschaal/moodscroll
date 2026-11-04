@@ -7,7 +7,11 @@
         transcript.json  timestamped speech
         ocr.json         timestamped on-screen text
         frames.json      which frame was taken when
-        frames/          key frames (one per scene change)
+        frames/          key frames (one per scene change), or a photo post's pictures
+
+A photo post (one picture, or a carousel) goes through the same steps without the
+speech: its pictures are the frames, numbered by slide instead of by second, and
+their text is read and searchable like a video's on-screen text.
 
 Two steps, so the notes can come from either place:
   extract()    everything local: fetch, transcribe, frames, OCR
@@ -63,16 +67,21 @@ def extract(src: str, out_root: Path, *, keep_video: bool = False,
     with tempfile.TemporaryDirectory(prefix="moodscroll-") as tmp:
         work = Path(tmp)
         source = step("fetching", sources.resolve, src, work)
-        source.meta["duration_s"] = source.meta.get("duration_s") or media.duration(source.video)
-        transcript = step("transcribing", media.transcribe, source.video)
-        frames = step("finding key frames", media.keyframes, source.video, work / "frames")
-        spoken = " ".join(s["text"] for s in transcript["segments"])
-        screen_text = step("reading on-screen text", media.ocr, work / "frames", frames, spoken)
+        if source.images:
+            transcript = {"language": None, "segments": []}
+            frames = step("preparing the pictures", media.slides, source.images, work / "frames")
+            screen_text = step("reading the text in the pictures", media.ocr, work / "frames", frames)
+        else:
+            source.meta["duration_s"] = source.meta.get("duration_s") or media.duration(source.video)
+            transcript = step("transcribing", media.transcribe, source.video)
+            frames = step("finding key frames", media.keyframes, source.video, work / "frames")
+            spoken = " ".join(s["text"] for s in transcript["segments"])
+            screen_text = step("reading on-screen text", media.ocr, work / "frames", frames, spoken)
 
-        out = _unique_dir(out_root, f"{date.today().isoformat()}-{slugify(source.meta.get('title') or 'video')}")
+        out = _unique_dir(out_root, f"{date.today().isoformat()}-{slugify(source.meta.get('title') or source.meta.get('kind') or 'video')}")
         out.mkdir()
         shutil.move(str(work / "frames"), out / "frames")
-        if keep_video and source.downloaded:  # never touch a file the user gave us
+        if keep_video and source.downloaded and source.video:  # never touch a file the user gave us
             shutil.move(str(source.video), out / source.video.name)
 
     _write_json(out / "meta.json", {**source.meta, "timings_s": timings})

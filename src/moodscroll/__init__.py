@@ -1,4 +1,4 @@
-"""MOODscroll: turn the videos you saved into notes you'll actually reread."""
+"""MooDscroll: turn the videos you saved into notes you'll actually reread."""
 
 import os
 from pathlib import Path

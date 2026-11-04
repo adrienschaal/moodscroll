@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import json
 
-from .media import ocr_lines, paragraphs
+from .media import is_photos, ocr_lines, paragraphs, place
 from .notes import WAITING_HINT, Notes
 
 LONG_SCREEN = 6  # more on-screen lines than this is a whole screen, not a title
+LONG_PICTURE = 20  # a picture's text is the content: fold only a really long one
 
 
 def _ts(seconds: float) -> str:
@@ -22,13 +23,16 @@ def _yaml(value) -> str:
 
 
 def markdown(meta: dict, transcript: dict, ocr: list[dict], frames: list[dict], notes: Notes | None) -> str:
-    title = (notes.title if notes else None) or meta.get("title") or "Untitled video"
+    photos = is_photos(meta)
+    title = (notes.title if notes else None) or meta.get("title") or ("Untitled post" if photos else "Untitled video")
     front = {
         "title": title,
+        "kind": meta.get("kind"),
         "source": meta.get("source"),
         "author": meta.get("author"),
         "site": meta.get("site"),
         "duration_s": meta.get("duration_s"),
+        "slides": meta.get("slides"),
         "language": transcript.get("language"),
     }
     if notes:
@@ -57,18 +61,22 @@ def markdown(meta: dict, transcript: dict, ocr: list[dict], frames: list[dict], 
     if meta.get("caption"):
         out += ["## Caption", "", meta["caption"].strip(), ""]
     if frames:
-        out += ["## Key frames", ""]
-        out += [f"![{_ts(f['t'])}](frames/{f['file']})" for f in frames] + [""]
+        out += ["## Pictures" if photos else "## Key frames", ""]
+        out += [f"![{place(meta, f['t'])}](frames/{f['file']})" for f in frames] + [""]
     if ocr:
-        out += ["## On-screen text"]
+        out += ["## Text in the pictures" if photos else "## On-screen text"]
         for o in ocr:
             lines = ocr_lines(o)
-            if len(lines) <= LONG_SCREEN:
-                out.append(f"- `{_ts(o['t'])}` " + " / ".join(lines))
+            if len(lines) <= (LONG_PICTURE if photos else LONG_SCREEN):
+                out.append(f"- `{place(meta, o['t'])}` " + " / ".join(lines))
             else:  # a whole screen (a web page, an app): list it under one entry
-                out.append(f"- `{_ts(o['t'])}` *{len(lines)} lines on screen*")
+                out.append(f"- `{place(meta, o['t'])}` *{len(lines)} lines*")
                 out += [f"  - {line}" for line in lines]
         out.append("")
+    if photos:
+        if meta.get("alt_text"):
+            out += ["## Instagram's description of the pictures"] + [f"- {a}" for a in meta["alt_text"]] + [""]
+        return "\n".join(out) + "\n"
     out += ["## Transcript", ""]
     if transcript["segments"]:
         for para in paragraphs(transcript["segments"]):

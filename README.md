@@ -1,9 +1,11 @@
-# MOODscroll
+# MooDscroll
 
-**Turn the videos you saved into notes you'll actually reread.**
+**Turn the videos and posts you saved into notes you'll actually reread.**
 
-Paste an Instagram, TikTok or YouTube link, or drop in a video file. MOODscroll
-transcribes it on your Mac, reads the text on screen and picks the key frames. Then
+Paste an Instagram, TikTok or YouTube link, or drop in a video file. MooDscroll
+transcribes it on your Mac, reads the text on screen and picks the key frames. Photo
+posts and carousels work too: it reads the text in every picture, so an address on
+slide 7 is searchable like anything said in a video. Then
 Claude Code or Codex writes the note: a summary, the key points, the exact quantities
 and steps, and the claims worth checking. Every note goes into one library you can
 search, and clicking any line of the transcript jumps the video to that moment.
@@ -16,17 +18,17 @@ Markdown files.
 ## How it works
 
 ```
-  MOODscroll app                           Claude Code or Codex
+  MooDscroll app                           Claude Code or Codex
   ──────────────                           ────────────────────
   paste links, drop videos                 "make notes from <link>"
-  read notes next to the video             "finish my MOODscroll notes"
+  read notes next to the video             "finish my MooDscroll notes"
   search everything                        "what was that pizza recipe I saved?"
             │                                         │
             └──────────►  ~/Moodscroll  ◄─────────────┘
                       one library, shared
 ```
 
-- **The MOODscroll app** is where your library lives. You add videos, read the notes
+- **The MooDscroll app** is where your library lives. You add videos, read the notes
   beside the video and search them.
 - **Claude Code or Codex** writes the notes, on the subscription you already pay for.
   You don't need an API key.
@@ -35,9 +37,9 @@ Two ways to add a video:
 
 1. **In Claude Code or Codex:** say *"make notes from https://…"*. The note appears in
    the app.
-2. **In the app:** paste a link or drop a file. MOODscroll does the transcript and the
+2. **In the app:** paste a link or drop a file. MooDscroll does the transcript and the
    frames right away, and the video shows **Waiting for notes**. Whenever you like, tell
-   Claude Code or Codex *"finish my MOODscroll notes"*. It writes the note for every
+   Claude Code or Codex *"finish my MooDscroll notes"*. It writes the note for every
    waiting video, and the app fills in by itself.
 
 **Prefer the app to write the notes by itself?** Click **Use a Claude API key** in
@@ -74,48 +76,51 @@ The installer explains each step and asks before the optional ones:
 
 1. It installs `uv` (manages Python for you) and `ffmpeg` (reads video) through
    Homebrew, if you don't have them yet.
-2. It downloads MOODscroll to `~/.local/share/moodscroll`.
+2. It downloads MooDscroll to `~/.local/share/moodscroll`.
 3. It downloads the speech-to-text model (about 1.6 GB, one time only).
-4. It adds **MOODscroll** to your Applications folder.
-5. It connects MOODscroll to Claude Code and Codex, whichever you have.
+4. It adds **MooDscroll** to your Applications folder.
+5. It connects MooDscroll to Claude Code and Codex, whichever you have.
 6. It offers to add a Claude API key. You can skip this and add one later in the app.
 
 **Then quit Claude Code or Codex completely (⌘Q) and reopen it**, so it loads
-MOODscroll.
+MooDscroll.
 
 If Apple's Command Line Tools are missing, the installer opens Apple's installer for
-them. Run MOODscroll's installer again once that finishes. You can run it as often as
-you like: it skips whatever is already done and updates MOODscroll to the latest version.
+them. Run MooDscroll's installer again once that finishes. You can run it as often as
+you like: it skips whatever is already done and updates MooDscroll to the latest version.
 
 ## Use it
 
 ### The app
 
-Open **MOODscroll**: press ⌘ Space, type `MOODscroll`, then press Return. It opens in
+Open **MooDscroll**: press ⌘ Space, type `MooDscroll`, then press Return. It opens in
 your browser at `http://127.0.0.1:8765`, an address that works only on your own Mac.
 
-- **Paste a link** and click **Make notes**. Or drag a video file (mp4, mov, m4v, webm,
-  mkv) onto the box.
+- **Paste a link** and click **Make notes**: a reel, a video, or an Instagram photo post
+  or carousel. Or drag a video file (mp4, mov, m4v, webm, mkv) or a picture onto the box.
+- **Each tile says what it is**: Reel, Video, Photo, or Carousel with its number of
+  pictures.
 - **Open a note** to read it next to the video. Click any transcript line, key frame or
-  piece of on-screen text to jump the video to that moment.
+  piece of on-screen text to jump the video to that moment. On a photo post, click a
+  picture, or the text read from it, to show that picture.
 - **Search** at the top looks through every note's title, summary, key points,
-  transcript and on-screen text.
+  transcript, on-screen text and the text in pictures.
 - **⋮** on a tile, then **Delete**, moves that note's folder to the Trash. To restore
   it, drag it from the Trash back into `~/Moodscroll`.
 - **Copy Markdown** puts the whole note on your clipboard, ready to paste into Notes,
   Obsidian or Notion.
-- **Quit MOODscroll** at the bottom of the page stops it.
+- **Quit MooDscroll** at the bottom of the page stops it.
 
-To keep MOODscroll in your Dock, open it once, then drag it from Applications onto the
+To keep MooDscroll in your Dock, open it once, then drag it from Applications onto the
 Dock.
 
 ### Import everything you saved on Instagram
 
-Instagram can send you a file listing every post you've saved. MOODscroll reads it, so
+Instagram can send you a file listing every post you've saved. MooDscroll reads it, so
 it never needs your Instagram login.
 
 1. **Ask Instagram for the file** (once, about 2 minutes). In the Instagram app: your
-   profile → **☰** → **Accounts Center** → **Your information and permissions** →
+   profile → **☰** → **Meta Account** → **Your information and permissions** →
    **Export your information** → **Create export**. Pick your Instagram profile, then
    **Export to device**. On **Confirm your export**, set:
    - **Customize information**: only **Saved**
@@ -132,12 +137,13 @@ it never needs your Instagram login.
 3. **Drop it in the app.** Click **import your Instagram saved posts** under the link
    box, then drop the ZIP, or the folder it unzipped to. You'll see every saved post, grouped by your collections,
    with the ones already in your library left out.
-4. **Pick what to import** and click **Import**. Videos are downloaded a few seconds
+4. **Pick what to import** and click **Import**. Posts are downloaded a few seconds
    apart, because Instagram blocks apps that download too fast. Each takes about
-   15 seconds. Photo posts are skipped. You can keep using the app meanwhile, or click
+   15 seconds. Photo posts and carousels come in too, with the text in each picture.
+   You can keep using the app meanwhile, or click
    **Stop**.
 
-The notes then wait for Claude Code or Codex (*"finish my MOODscroll notes"*); batches
+The notes then wait for Claude Code or Codex (*"finish my MooDscroll notes"*); batches
 of 20 to 50 are easiest on your subscription. With an API key on, you can have the app
 write them as it goes, and it shows the cost first. To pick up later where you left
 off, drop the same ZIP again: posts already in your library are skipped.
@@ -148,8 +154,8 @@ Talk to it the way you'd talk to a person:
 
 | Say | What happens |
 |---|---|
-| *make notes from https://www.instagram.com/reel/…* | MOODscroll processes the video on your Mac, then the assistant writes and saves the note |
-| *finish my MOODscroll notes* | notes for every video waiting in the app |
+| *make notes from https://www.instagram.com/reel/…* | MooDscroll processes the video on your Mac, then the assistant writes and saves the note |
+| *finish my MooDscroll notes* | notes for every video waiting in the app |
 | *what was that BBQ pizza recipe I saved?* | searches your library and reads you the note |
 | *redo the notes for the gnocchi video, shorter* | rewrites a note you already have |
 
@@ -180,7 +186,7 @@ Each video gets its own folder in `~/Moodscroll/`, for example
 `2026-11-03-meal-prep-bbq-chicken-baguette-pizzas/`. Each folder holds:
 
 - `note.md`, the note in plain Markdown, which any app can open
-- `frames/`, the key frames
+- `frames/`, the key frames (for a photo post, its pictures)
 - `transcript.json`, `ocr.json`, `notes.json` and `meta.json`, the raw material the
   note was built from
 - the video itself, if you added a file or used `--keep-video`
@@ -194,15 +200,15 @@ To keep the library somewhere else, set `MOODSCROLL_DIR=/path/to/folder`.
 | Download | the internet | [yt-dlp](https://github.com/yt-dlp/yt-dlp), with Instagram's public embed page as a fallback. Or your own file. |
 | Speech to text | **your Mac** | Whisper large-v3-turbo on Apple Silicon ([mlx-whisper](https://github.com/ml-explore/mlx-examples)) |
 | Key frames | **your Mac** | ffmpeg: one frame at each scene change, and at least one every 8 seconds |
-| On-screen text | **your Mac** | Apple Vision, the same text recognition Photos uses |
-| The written note | Claude Code, Codex, or the Claude API | gets the transcript, on-screen text, caption and 4 frames |
+| On-screen text | **your Mac** | Apple Vision, the same text recognition Photos uses; for a photo post, every picture |
+| The written note | Claude Code, Codex, or the Claude API | gets the transcript, on-screen text, caption and 4 frames (up to 10 pictures for a carousel) |
 
 **What leaves your Mac:** only the last step. It sends the transcript, the on-screen
 text, the caption and four frames, either to the assistant you're chatting with or to
 the Claude API if you added a key. The video itself is never uploaded.
 
 **Why the transcripts hold up:** Whisper tends to invent sentences over background
-music. MOODscroll drops a segment when:
+music. MooDscroll drops a segment when:
 
 - it repeats itself
 - the model rated it very unlikely (real speech scores about −0.1 log-probability,
@@ -213,13 +219,13 @@ music. MOODscroll drops a segment when:
 
 | Problem | Fix |
 |---|---|
-| Claude Code or Codex doesn't know about MOODscroll | Quit it with ⌘Q (closing the window isn't enough), then reopen it. In Claude Code, `/mcp` should list `moodscroll`. In Codex, run `codex mcp list`. |
-| It looks for files instead of using MOODscroll | Mention MOODscroll by name, as in *"finish my MOODscroll notes"* or *"use MOODscroll to make notes from …"*. |
-| The app opens a page that won't load | Wait a few seconds and reload, since the first start is the slowest. If it still won't load, check `~/Library/Logs/MOODscroll.log`. |
-| "Address already in use" | MOODscroll is already running. Open `http://127.0.0.1:8765`, or click **Quit MOODscroll** there and open the app again. |
+| Claude Code or Codex doesn't know about MooDscroll | Quit it with ⌘Q (closing the window isn't enough), then reopen it. In Claude Code, `/mcp` should list `moodscroll`. In Codex, run `codex mcp list`. |
+| It looks for files instead of using MooDscroll | Mention MooDscroll by name, as in *"finish my MooDscroll notes"* or *"use MooDscroll to make notes from …"*. |
+| The app opens a page that won't load | Wait a few seconds and reload, since the first start is the slowest. If it still won't load, check `~/Library/Logs/MooDscroll.log`. |
+| "Address already in use" | MooDscroll is already running. Open `http://127.0.0.1:8765`, or click **Quit MooDscroll** there and open the app again. |
 | A link won't download | The video may be private or deleted, or the creator may have turned off embedding. Save it with the platform's own download button, then drop the file in. |
-| Notes failed with an API error | Check your key and credit at platform.claude.com. The video stays waiting: click **Write them now** to retry, or say *"finish my MOODscroll notes"* in Claude Code or Codex. |
-| A note looks out of date, or a fix doesn't show | After updating MOODscroll, quit Claude Code or Codex (⌘Q) and reopen it. They keep running the version that was there when they started. |
+| Notes failed with an API error | Check your key and credit at platform.claude.com. The video stays waiting: click **Write them now** to retry, or say *"finish my MooDscroll notes"* in Claude Code or Codex. |
+| A note looks out of date, or a fix doesn't show | After updating MooDscroll, quit Claude Code or Codex (⌘Q) and reopen it. They keep running the version that was there when they started. |
 | Anything else | Run the installer again. It repairs whatever is missing. |
 
 ## Uninstall
@@ -228,7 +234,7 @@ music. MOODscroll drops a segment when:
 cd ~/.local/share/moodscroll && uv run moodscroll-setup --uninstall
 ```
 
-This removes the app and disconnects MOODscroll from Claude Code and Codex. Your notes
+This removes the app and disconnects MooDscroll from Claude Code and Codex. Your notes
 (`~/Moodscroll`) and your key (`~/.config/moodscroll`) stay. To remove everything else:
 
 ```bash

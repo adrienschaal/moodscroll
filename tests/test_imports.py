@@ -87,7 +87,7 @@ def test_import_read_marks_library_and_start_queues(client, monkeypatch):
 
     def fake_run(src, root, **kw):
         calls.append(src)
-        raise RuntimeError("download failed: There is no video in this post")
+        raise RuntimeError("download failed: private post")
     monkeypatch.setattr(pipeline, "run", fake_run)
     r = client.post("/api/import/start", json={"posts": [
         {"code": "BBBBB22222", "kind": "p", "author": "traveller"},
@@ -100,7 +100,7 @@ def test_import_read_marks_library_and_start_queues(client, monkeypatch):
             break
         time.sleep(0.05)
     assert calls == ["https://www.instagram.com/p/BBBBB22222/"]
-    assert job["status"] == "skipped" and job["label"] == "@traveller"
+    assert job["status"] == "failed" and job["label"] == "@traveller"
 
 
 # The layout of a real export from November 2026 (values shortened).

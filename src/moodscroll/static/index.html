@@ -3,21 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MOODscroll</title>
+  <title>MooDscroll</title>
   <link rel="icon" href="/icon.png">
   <link rel="apple-touch-icon" href="/icon.png">
-  <link rel="stylesheet" href="/style.css?v=7">
+  <link rel="stylesheet" href="/style.css?v=10">
 </head>
 <body>
   <header class="top">
-    <a href="#/" class="brand">MOOD<span>scroll</span></a>
+    <a href="#/" class="brand">MooD<span>scroll</span></a>
     <input id="search" type="search" placeholder="Search everything you've saved" autocomplete="off">
   </header>
 
   <main id="view"></main>
 
   <footer>
-    <span>© 2026 Adrien Schaal · <a href="https://github.com/adrienschaal/moodscroll" target="_blank" rel="noopener">MIT License</a> · <a href="#" id="quit">Quit MOODscroll</a></span>
+    <span>© 2026 Adrien Schaal · <a href="https://github.com/adrienschaal/moodscroll" target="_blank" rel="noopener">MIT License</a> · <a href="#" id="quit">Quit MooDscroll</a></span>
     <span>Made in Cambridge, MA by a guy who saved 1,019 reels and rewatched none of them.</span>
   </footer>
 
@@ -27,8 +27,8 @@
         <input id="url" type="url" placeholder="Paste a link — Instagram, TikTok, YouTube…" required>
         <button type="submit">Make notes</button>
       </form>
-      <p class="hint">or drop a video file anywhere on this box ·
-        <label class="link">choose a file<input id="file" type="file" accept="video/*" hidden></label> ·
+      <p class="hint">or drop a video or picture anywhere on this box ·
+        <label class="link">choose a file<input id="file" type="file" accept="video/*,image/*" hidden></label> ·
         <a href="#/import">import your Instagram saved posts</a></p>
     </section>
     <section id="banner"></section>
@@ -42,6 +42,6 @@
     </section>
   </template>
 
-  <script src="/app.js?v=7"></script>
+  <script src="/app.js?v=10"></script>
 </body>
 </html>

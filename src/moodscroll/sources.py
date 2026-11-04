@@ -13,9 +13,13 @@ from pathlib import Path
 
 @dataclass
 class Source:
-    video: Path
+    video: Path | None  # None for a photo post
     meta: dict = field(default_factory=dict)
     downloaded: bool = False  # True if we fetched it, so we may delete it afterwards
+    images: list[Path] = field(default_factory=list)  # a photo post: one per slide, in order
+
+
+IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".heic", ".webp")
 
 
 class SourceError(Exception):
@@ -31,13 +35,16 @@ def resolve(src: str, workdir: Path) -> Source:
         path = Path(src).expanduser().resolve()
         if not path.is_file():
             raise SourceError(f"no such file: {path}")
-        return Source(video=path, meta={"title": path.stem, "source": str(path)})
+        if path.suffix.lower() in IMAGE_SUFFIXES:  # a screenshot or a saved picture
+            return Source(video=None, images=[path], meta={"title": path.stem, "source": str(path), "kind": "photo"})
+        return Source(video=path, meta={"title": path.stem, "source": str(path), "kind": "video"})
 
     try:
         return _download_ytdlp(src, workdir)
     except SourceError as first:
         # yt-dlp is the general path. For Instagram, the public embed page is a
-        # second chance when yt-dlp's extractor is broken or rate-limited.
+        # second chance when yt-dlp's extractor is broken or rate-limited, and the
+        # way in for photo posts and carousels, which yt-dlp doesn't download.
         if "instagram.com" in src:
             try:
                 return _download_instagram_embed(src, workdir)
@@ -81,6 +88,7 @@ def _download_ytdlp(url: str, workdir: Path) -> Source:
             "upload_date": info.get("upload_date"),
             "site": info.get("extractor_key"),
             "source": info.get("webpage_url") or url,
+            "kind": "reel" if "instagram.com" in url else "video",
         },
     )
 
@@ -118,6 +126,54 @@ def instagram_code(url: str) -> str | None:
     return m.group(1) if m else None
 
 
+def embed_post(html: str) -> dict | None:
+    """The post as the embed page describes it: {"__typename": "GraphImage" |
+    "GraphSidecar" | "GraphVideo", "display_url", "edge_sidecar_to_children", ...},
+    or None if the page doesn't carry it."""
+    i = html.find('"contextJSON":')
+    if i < 0:
+        return None
+    try:
+        raw, _ = json.JSONDecoder().raw_decode(html[i + len('"contextJSON":'):])
+        return json.loads(raw)["gql_data"]["shortcode_media"]
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def _photo_post(post: dict, code: str, workdir: Path) -> Source:
+    """A photo, or a carousel of photos: every slide downloaded in order. A video
+    slide in a carousel is kept as its cover image."""
+    slides = [e["node"] for e in (post.get("edge_sidecar_to_children") or {}).get("edges", [])] or [post]
+    folder = workdir / "images"
+    folder.mkdir()
+    images, alt = [], []
+    for n, slide in enumerate(slides, 1):
+        if not slide.get("display_url"):
+            continue
+        path = folder / f"{n:04d}.jpg"
+        path.write_bytes(_get(slide["display_url"]))
+        images.append(path)
+        alt.append(slide.get("accessibility_caption") or "")
+    if not images:
+        raise SourceError("no video or pictures in the embed page (private, removed or embedding disabled)")
+    caption = ((post.get("edge_media_to_caption") or {}).get("edges") or [{}])[0].get("node", {}).get("text")
+    return Source(
+        video=None, images=images, downloaded=True,
+        meta={
+            "title": None,
+            "author": (post.get("owner") or {}).get("username"),
+            "caption": caption,
+            "duration_s": None,
+            "site": "Instagram",
+            "source": f"https://www.instagram.com/p/{code}/",
+            "kind": "carousel" if len(images) > 1 else "photo",
+            "slides": len(images),
+            # Instagram's own description of each picture, when it wrote one.
+            "alt_text": [a for a in alt if a and not a.startswith("Photo by")] or None,
+        },
+    )
+
+
 def _download_instagram_embed(url: str, workdir: Path) -> Source:
     code = instagram_code(url)
     if not code:
@@ -129,8 +185,13 @@ def _download_instagram_embed(url: str, workdir: Path) -> Source:
 
     video_url = _field(html, r'video_url\\+":\\+"(.*?)\\+"')
     if not video_url:
-        raise SourceError("no video in the embed page (private, removed, embedding "
-                          "disabled, or a photo post)")
+        post = embed_post(html)
+        if post and post.get("__typename") in ("GraphImage", "GraphSidecar"):
+            try:
+                return _photo_post(post, code, workdir)
+            except OSError as e:
+                raise SourceError(f"couldn't download the pictures: {e}") from e
+        raise SourceError("no video in the embed page (private, removed or embedding disabled)")
     video = workdir / "video.mp4"
     with open(video, "wb") as f:
         f.write(_get(video_url))
@@ -146,6 +207,7 @@ def _download_instagram_embed(url: str, workdir: Path) -> Source:
             "duration_s": float(duration) if duration else None,
             "site": "Instagram",
             "source": f"https://www.instagram.com/reel/{code}/",
+            "kind": "reel",
         },
     )
 

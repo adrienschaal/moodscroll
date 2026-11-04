@@ -36,7 +36,7 @@ def test_media_stays_inside_the_note_folder(client):
 def test_job_input_is_validated(client):
     assert client.post("/api/jobs", data={"url": "not a link"}).status_code == 400
     r = client.post("/api/jobs", files={"file": ("notes.txt", b"x", "text/plain")})
-    assert r.status_code == 400 and "not a video" in r.json()["detail"]
+    assert r.status_code == 400 and "not a video or picture" in r.json()["detail"]
     assert client.post("/api/jobs").status_code == 400
 
 

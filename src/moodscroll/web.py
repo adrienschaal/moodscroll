@@ -32,8 +32,9 @@ from .media import ocr_lines, paragraphs
 
 STATIC = Path(__file__).parent / "static"
 VIDEO_TYPES = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
+IMAGE_TYPES = set(sources.IMAGE_SUFFIXES)  # a screenshot or saved picture becomes a photo post
 
-app = FastAPI(title="MOODscroll")
+app = FastAPI(title="MooDscroll")
 
 ALLOWED_HOSTS = {"127.0.0.1:8765", "localhost:8765"}
 
@@ -101,8 +102,9 @@ def _worker() -> None:
                 meta.update(job["extra_meta"])
                 meta_file.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n")
             upload = job.get("upload")
-            if upload:  # an uploaded file lives in a temp folder; keep it with its note
-                shutil.move(upload, folder / f"video{Path(upload).suffix.lower()}")
+            if upload:  # an uploaded file lives in a temp folder; keep a video with its note
+                if Path(upload).suffix.lower() in VIDEO_TYPES:  # a picture is already in frames/
+                    shutil.move(upload, folder / f"video{Path(upload).suffix.lower()}")
                 shutil.rmtree(Path(upload).parent, ignore_errors=True)
                 meta_file = folder / "meta.json"  # record the file's name, not the temp path
                 meta = json.loads(meta_file.read_text())
@@ -112,10 +114,7 @@ def _worker() -> None:
             _update(job_id, status="done", folder=folder.name, step=None,
                     waiting=d["notes"] is None, notes_error=d["meta"].get("notes_error"))
         except Exception as e:  # shown to the user in the job list
-            if job.get("batch") and "no video" in str(e).lower():
-                _update(job_id, status="skipped", error="a photo post, no video", step=None)
-            else:
-                _update(job_id, status="failed", error=str(e), step=None)
+            _update(job_id, status="failed", error=str(e), step=None)
         finally:
             _update(job_id, finished=time.time())
 
@@ -146,14 +145,14 @@ async def create_job(url: str | None = Form(None), file: UploadFile | None = Fil
         return _enqueue(url, url)
     if file and file.filename:
         suffix = Path(file.filename).suffix.lower()
-        if suffix not in VIDEO_TYPES:
-            raise HTTPException(400, f"not a video file ({suffix or 'no extension'})")
+        if suffix not in VIDEO_TYPES | IMAGE_TYPES:
+            raise HTTPException(400, f"not a video or picture ({suffix or 'no extension'})")
         tmpdir = Path(tempfile.mkdtemp(prefix="moodscroll-upload-"))
         path = tmpdir / f"{Path(file.filename).stem}{suffix}"
         with open(path, "wb") as f:
             shutil.copyfileobj(file.file, f)
         return _enqueue(file.filename, str(path), upload=str(path))
-    raise HTTPException(400, "send a link or a video file")
+    raise HTTPException(400, "send a link, a video or a picture")
 
 
 @app.get("/api/jobs")
@@ -313,7 +312,7 @@ def get_note(name: str):
     video = next((p.name for p in folder.glob("video.*")), None)
     return {
         "folder": folder.name,
-        "meta": d["meta"],
+        "meta": d["meta"] | {"kind": library.kind(d["meta"])},
         "transcript": d["transcript"],
         "paragraphs": paragraphs(d["transcript"]["segments"]),
         "ocr": [{"t": o["t"], "lines": ocr_lines(o)} for o in d["ocr"]],
@@ -372,7 +371,7 @@ def main() -> None:
 
     import uvicorn
 
-    p = argparse.ArgumentParser(prog="moodscroll-web", description="Run the MOODscroll web app.")
+    p = argparse.ArgumentParser(prog="moodscroll-web", description="Run the MooDscroll web app.")
     p.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
     args = p.parse_args()
     if not args.no_browser:

@@ -76,10 +76,20 @@ def summary(folder: Path) -> dict:
         "summary": n.summary if n else None,
         "source": m.get("source"),
         "duration_s": m.get("duration_s"),
+        "kind": kind(m),
+        "slides": m.get("slides"),
         "thumb": d["frames"][0]["file"] if d["frames"] else None,
         "has_notes": n is not None,
         "notes_error": m.get("notes_error"),
     }
+
+
+def kind(meta: dict) -> str:
+    """reel, video, photo or carousel. Notes made before photo posts were supported
+    don't say; an Instagram /reel/ link is a reel, anything else a video."""
+    if meta.get("kind"):
+        return meta["kind"]
+    return "reel" if "instagram.com" in (meta.get("source") or "") else "video"
 
 
 def search(query: str, root: Path | None = None, limit: int = 10) -> list[dict]:
@@ -94,7 +104,7 @@ def search(query: str, root: Path | None = None, limit: int = 10) -> list[dict]:
                            " ".join(f"{x.label} {x.value}" for x in n.details)] if n else [m.get("title") or ""]).lower()
         weak = " ".join([m.get("caption") or "", m.get("author") or ""]
                         + [s["text"] for s in d["transcript"]["segments"]]
-                        + [o["text"] for o in d["ocr"]]).lower()
+                        + [o["text"] for o in d["ocr"]] + (m.get("alt_text") or [])).lower()
         score = sum(3 * strong.count(w) + weak.count(w) for w in words) if words else 1
         if score:
             hits.append((score, folder))

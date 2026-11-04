@@ -22,7 +22,7 @@ from . import KEY_FILE, keys, library, media
 from .notes import ASK_PHRASE
 
 REPO = Path(__file__).resolve().parents[2]
-APP = Path.home() / "Applications" / "MOODscroll.app"
+APP = Path.home() / "Applications" / "MooDscroll.app"
 ICON = REPO / "assets" / "AppIcon.icns"
 DESKTOP_CONFIG = Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
 CODEX_CONFIG = Path.home() / ".codex" / "config.toml"
@@ -30,7 +30,7 @@ CODEX_CONFIG = Path.home() / ".codex" / "config.toml"
 CODEX_BINARIES = ("/Applications/ChatGPT.app/Contents/Resources/codex", "/Applications/Codex.app/Contents/Resources/codex")
 # Codex stops waiting on a tool after 60 s by default; a long video takes longer.
 CODEX_TIMEOUTS = 'startup_timeout_sec = 60\ntool_timeout_sec = 900\n'
-LOG = Path.home() / "Library" / "Logs" / "MOODscroll.log"
+LOG = Path.home() / "Library" / "Logs" / "MooDscroll.log"
 MCP_NAME = "moodscroll"
 
 BOLD, DIM, GREEN, RESET = "\033[1m", "\033[2m", "\033[32m", "\033[0m"
@@ -95,7 +95,7 @@ def ocr_helper() -> None:
 def api_key(yes: bool) -> None:
     say("5/5  Claude API key (optional)")
     note("Not needed if you use Claude Code or Codex: they write the notes on your subscription.")
-    note("With a key, the MOODscroll app also writes notes by itself, about $0.04 for a one-minute video.")
+    note("With a key, the MooDscroll app also writes notes by itself, about $0.04 for a one-minute video.")
     note("You can switch between the two any time, in the app.")
     if keys.active():
         done(f"already on ({KEY_FILE if KEY_FILE.exists() else 'environment'})")
@@ -118,7 +118,7 @@ def api_key(yes: bool) -> None:
 
 
 def mac_app(yes: bool) -> None:
-    say("3/5  MOODscroll app (Applications, Spotlight, Launchpad, Dock)")
+    say("3/5  MooDscroll app (Applications, Spotlight, Launchpad, Dock)")
     if not ask(f"Create {APP}?", yes):
         note("skipped; start it with: uv run moodscroll-web")
         return
@@ -129,18 +129,18 @@ def mac_app(yes: bool) -> None:
     shutil.copy(ICON, resources / "AppIcon.icns")
     with open(APP / "Contents" / "Info.plist", "wb") as f:
         plistlib.dump({
-            "CFBundleName": "MOODscroll",
-            "CFBundleDisplayName": "MOODscroll",
+            "CFBundleName": "MooDscroll",
+            "CFBundleDisplayName": "MooDscroll",
             "CFBundleIdentifier": "com.adrienschaal.moodscroll",
-            "CFBundleExecutable": "MOODscroll",
+            "CFBundleExecutable": "MooDscroll",
             "CFBundleIconFile": "AppIcon",
             "CFBundlePackageType": "APPL",
             "CFBundleShortVersionString": "1.0",
             "LSUIElement": True,  # no Dock bounce: the window is a browser tab
         }, f)
-    launcher = macos / "MOODscroll"
+    launcher = macos / "MooDscroll"
     launcher.write_text(f"""#!/bin/bash
-# Starts the MOODscroll server in the background if it isn't running, then opens it.
+# Starts the MooDscroll server in the background if it isn't running, then opens it.
 URL=http://127.0.0.1:8765
 if ! /usr/bin/curl -s -o /dev/null --max-time 1 "$URL/api/jobs"; then
   cd "$HOME"
@@ -156,7 +156,7 @@ open "$URL"
     # Tell Finder and Spotlight about the new app (and its icon) right away.
     subprocess.run(["/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework"
                     "/Support/lsregister", "-f", str(APP)], capture_output=True)
-    done(f"{APP} — open it from Spotlight (⌘ Space, type MOODscroll); drag it to the Dock to keep it")
+    done(f"{APP} — open it from Spotlight (⌘ Space, type MooDscroll); drag it to the Dock to keep it")
 
 
 def connect_assistants(yes: bool) -> None:
@@ -184,7 +184,7 @@ def connect_assistants(yes: bool) -> None:
             done("Codex: connected") if ok else note("Codex: failed; see the README to add it by hand")
     if not found:
         note("Neither Claude Code nor Codex found. Install one, then run this again;")
-        note("or add an API key above so the MOODscroll app writes notes by itself.")
+        note("or add an API key above so the MooDscroll app writes notes by itself.")
     else:
         note("Quit and reopen Claude / ChatGPT (⌘Q) so they load it.")
 
@@ -205,7 +205,7 @@ def connect_codex(binary: str) -> bool:
 
 
 def uninstall() -> None:
-    say("Uninstalling MOODscroll")
+    say("Uninstalling MooDscroll")
     if APP.exists():
         shutil.rmtree(APP)
         done(f"removed {APP}")
@@ -247,7 +247,7 @@ def main() -> None:
     except KeyboardInterrupt:
         sys.exit("\nStopped. Run moodscroll-setup again any time; it picks up where it left off.")
     say("All set.")
-    print("  Open MOODscroll: ⌘ Space, type MOODscroll, Return.")
+    print("  Open MooDscroll: ⌘ Space, type MooDscroll, Return.")
     print('  In Claude Code or Codex, say: "make notes from <a link>", or after adding videos')
     print(f'  in the app: "{ASK_PHRASE}".')
     note(f"Your notes are saved in {library.DEFAULT_ROOT}")

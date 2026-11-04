@@ -1,6 +1,6 @@
 """Reads the list of posts you saved from Instagram's own data export.
 
-Instagram: Accounts Center → Your information and permissions → Export your
+Instagram: Meta Account → Your information and permissions → Export your
 information → Export to device, with only "Saved" ticked. The ZIP it sends holds
 links to your saved posts (not the videos), in JSON or HTML:
 
