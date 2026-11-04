@@ -13,6 +13,16 @@ search, and clicking any line of the transcript jumps the video to that moment.
 It runs on your Mac. There's no account and no server, and your library is a folder of
 Markdown files.
 
+## Demo
+
+<!-- demo video player -->
+
+3½ minutes: making notes from a reel, Claude writing them on a subscription you already
+pay for, finding a word that only appears inside a carousel's pictures, and importing a
+whole Instagram "Saved" export.
+[Full-quality download](https://github.com/adrienschaal/moodscroll/releases/download/v1.0.0/MooDscroll-demo.mp4)
+(3456 × 2168, 75 MB).
+
 ---
 
 ## How it works
