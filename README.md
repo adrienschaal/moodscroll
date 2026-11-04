@@ -15,7 +15,7 @@ Markdown files.
 
 ## Demo
 
-<!-- demo video player -->
+https://github.com/user-attachments/assets/fbfa2e1d-f42c-425b-aadc-7c0d83c28e7f
 
 3½ minutes: making notes from a reel, Claude writing them on a subscription you already
 pay for, finding a word that only appears inside a carousel's pictures, and importing a
