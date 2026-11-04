@@ -23,8 +23,9 @@ let liveTimer = null;
 function route() {
   clearTimeout(pollTimer);
   clearInterval(liveTimer);
-  const m = location.hash.match(/^#\/note\/(.+)$/);
-  if (m) showNote(decodeURIComponent(m[1]));
+  // #/note/<folder>, or #/note/<folder>?at=5 from a search: open at that slide or moment
+  const m = location.hash.match(/^#\/note\/([^?]+)(?:\?at=([\d.]+))?$/);
+  if (m) showNote(decodeURIComponent(m[1]), m[2] === undefined ? null : Number(m[2]));
   else if (location.hash === "#/import") showImport();
   else showHome();
 }
@@ -281,13 +282,14 @@ async function loadLibrary() {
   const shown = items.filter((i) => !category || i.category === category);
   grid.innerHTML = shown.length ? shown.map((i) => `
     <div class="card">
-      <a class="card-link" href="#/note/${encodeURIComponent(i.folder)}">
+      <a class="card-link" href="#/note/${encodeURIComponent(i.folder)}${i.match ? `?at=${i.match.t}` : ""}">
         <div class="thumb" style="background-image:url('${i.thumb ? `/media/${encodeURIComponent(i.folder)}/frames/${i.thumb}` : ""}')">
           <span class="kind kind-${esc(i.kind || "video")}">${esc(kindLabel(i))}</span></div>
         <div class="body">
           ${i.has_notes ? "" : '<span class="badge">Waiting for notes</span>'}
           <div class="title">${esc(i.title || i.folder)}</div>
           <div class="sub">${esc([i.author, i.category].filter(Boolean).join(" · "))}</div>
+          ${i.match ? `<div class="hit"><b>${esc(isPhotos(i) ? `Slide ${i.match.t}` : ts(i.match.t))}</b> ${esc(i.match.text.slice(0, 90))}</div>` : ""}
         </div>
       </a>
       <button class="more" data-act="card-menu" aria-label="More actions" title="More">⋮</button>
@@ -300,7 +302,7 @@ async function loadLibrary() {
 
 // --- Note: video beside the notes, every timestamp clickable ------------------------
 
-async function showNote(folder) {
+async function showNote(folder, openAt = null) {
   clearInterval(liveTimer);
   if (!status) loadStatus().catch(() => {});
   let d;
@@ -311,7 +313,7 @@ async function showNote(folder) {
     return;
   }
   // The folder is renamed after its title once notes are written; follow it.
-  const here = `#/note/${encodeURIComponent(d.folder)}`;
+  const here = `#/note/${encodeURIComponent(d.folder)}${openAt === null ? "" : `?at=${openAt}`}`;
   if (location.hash !== here) history.replaceState(null, "", here);
   const n = d.notes, m = d.meta;
   const frameUrl = (f) => `/media/${encodeURIComponent(d.folder)}/frames/${f.file}`;
@@ -390,6 +392,21 @@ async function showNote(folder) {
       lines.forEach((l) => l.classList.toggle("now", now >= l.dataset.start && now < l.dataset.end));
     });
   }
+  window.scrollTo(0, 0);
+  // Opened from a search: go to the slide or moment the query matched, and mark it.
+  if (openAt !== null) {
+    const target = [...view.querySelectorAll(".line [data-t], .para [data-t]")].find((b) => Number(b.dataset.t) === openAt);
+    if (photos) {
+      const f = d.frames.find((x) => x.t === openAt);
+      if (f) $("#slide").src = frameUrl(f);
+      view.querySelectorAll(".frames button").forEach((b) => b.classList.toggle("on", Number(b.dataset.t) === openAt));
+    } else if (player) {  // seek once the video can be seeked
+      if (player.readyState >= 1) player.currentTime = openAt;
+      else player.addEventListener("loadedmetadata", () => { player.currentTime = openAt; }, { once: true });
+    }
+    const row = target?.closest(".line, .para");
+    if (row) { row.classList.add("found"); row.scrollIntoView({ block: "center" }); }
+  }
   $("#copy").addEventListener("click", async () => {
     await navigator.clipboard.writeText(d.markdown);
     $("#copy").textContent = "Copied";
@@ -398,10 +415,9 @@ async function showNote(folder) {
     liveTimer = setInterval(async () => {
       if (document.hidden) return;
       const fresh = await api(`/api/notes/${encodeURIComponent(d.folder)}`).catch(() => null);
-      if (fresh?.notes) { clearInterval(liveTimer); showNote(fresh.folder); }
+      if (fresh?.notes) { clearInterval(liveTimer); showNote(fresh.folder, openAt); }
     }, 4000);
   }
-  window.scrollTo(0, 0);
 }
 
 $("#quit").addEventListener("click", async (e) => {

@@ -84,6 +84,14 @@ def test_photo_post_is_searchable_by_its_pictures_text(tmp_path):
     hits = library.search("yves toudic", root=tmp_path)
     assert [h["folder"] for h in hits] == ["2026-11-04-bakeries"]
     assert hits[0]["kind"] == "carousel" and hits[0]["slides"] == 2
+    assert hits[0]["match"] == {"t": 2, "text": OCR[0]["text"], "in": "screen"}  # opens on slide 2
+    assert library.search("parisfood", root=tmp_path)[0]["match"] is None  # only the author matched
+
+
+def test_video_search_points_at_the_moment():
+    d = {"ocr": [{"t": 3, "text": "Day one"}], "transcript": {"segments": [
+        {"start": 12.5, "text": "add the miso paste now"}, {"start": 40, "text": "miso again"}]}}
+    assert library.best_match(d, ["miso", "paste"]) == {"t": 12.5, "text": "add the miso paste now", "in": "speech"}
 
 
 def test_photo_post_note_and_prompt(tmp_path):

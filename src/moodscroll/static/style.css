@@ -222,3 +222,8 @@ button:disabled { opacity: .6; cursor: default; }
 .kind-photo, .kind-carousel { background: rgb(255 255 255 / .9); color: #111; }
 /* A photo post: the thumbnails pick which picture is shown */
 .frames button.on { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Search: where in the post the words are, and that place marked on the note */
+.card .hit { margin-top: 6px; font-size: .8rem; color: var(--muted); line-height: 1.35; }
+.card .hit b { color: var(--accent); font-weight: 600; margin-right: 4px; }
+.found { background: var(--accent-soft); border-radius: 6px; box-shadow: 0 0 0 6px var(--accent-soft); }

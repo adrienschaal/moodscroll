@@ -107,6 +107,24 @@ def search(query: str, root: Path | None = None, limit: int = 10) -> list[dict]:
                         + [o["text"] for o in d["ocr"]] + (m.get("alt_text") or [])).lower()
         score = sum(3 * strong.count(w) + weak.count(w) for w in words) if words else 1
         if score:
-            hits.append((score, folder))
+            hits.append((score, folder, best_match(d, words)))
     hits.sort(key=lambda h: (-h[0], h[1].name))
-    return [summary(f) | {"score": s} for s, f in hits[:limit]]
+    return [summary(f) | {"score": s, "match": match} for s, f, match in hits[:limit]]
+
+
+def best_match(d: dict, words: list[str]) -> dict | None:
+    """Where in the post the query is: the picture or on-screen text, or the moment
+    in the transcript, holding the most query words. {"t", "text", "in"}, where t is
+    a slide number for a photo post and seconds for a video; None if the words are
+    only in the title, notes or caption."""
+    if not words:
+        return None
+    places = [(o["t"], o["text"], "screen") for o in d["ocr"]]
+    places += [(s["start"], s["text"], "speech") for s in d["transcript"]["segments"]]
+    best, best_n = None, 0
+    for t, text, where in places:
+        low = text.lower()
+        n = sum(w in low for w in words)
+        if n > best_n:
+            best, best_n = {"t": t, "text": text, "in": where}, n
+    return best
