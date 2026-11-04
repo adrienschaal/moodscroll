@@ -188,3 +188,27 @@ button:disabled { opacity: .6; cursor: default; }
   background: none; color: var(--bad); font: inherit; cursor: pointer;
 }
 .menu button:hover { background: var(--line); }
+
+/* Import from Instagram's export */
+.import { max-width: 760px; }
+.import h1 { margin: 6px 0 8px; }
+.import h2 { font-size: 1.05rem; margin: 26px 0 8px; }
+.import .lead { color: var(--muted); }
+.steps { padding-left: 22px; line-height: 1.6; }
+.steps ul { margin: 4px 0; padding-left: 18px; }
+.import .fine { color: var(--muted); font-size: .85rem; }
+.imp-cols { margin: 10px 0; }
+.imp-rows { border: 1px solid var(--line); border-radius: var(--radius); max-height: 420px; overflow: auto; }
+.imp-row { display: flex; gap: 10px; align-items: baseline; padding: 8px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.imp-row:last-child { border-bottom: 0; }
+.imp-row .who { font-weight: 600; min-width: 140px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; }
+.imp-row .what { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.imp-row .cap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imp-row a { flex-shrink: 0; }
+
+.imp-footer { position: sticky; bottom: 0; background: var(--bg); padding: 14px 0; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.imp-footer p { flex-basis: 100%; margin: 0; }
+.imp-notes { flex-basis: 100%; }
+.import-job { flex-wrap: wrap; }
+.import-fails { flex-basis: 100%; font-size: .85rem; color: var(--muted); }
+.import-fails p { margin: 4px 0; }

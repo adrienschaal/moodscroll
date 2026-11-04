@@ -38,6 +38,18 @@ def resolve_folder(name: str, root: Path | None = None) -> Path:
     raise ValueError(f"no video folder named {name!r} in {root}")
 
 
+def instagram_codes(root: Path | None = None) -> set[str]:
+    """Shortcodes of the Instagram posts already in the library, so an import skips them."""
+    from .sources import instagram_code
+
+    codes = set()
+    for f in folders(root):
+        meta = load(f)["meta"]
+        if code := instagram_code(meta.get("source") or ""):
+            codes.add(code)
+    return codes
+
+
 def waiting(root: Path | None = None) -> list[dict]:
     """Videos that were processed but have no notes yet, oldest first, each with
     what writing its notes through the API should cost."""

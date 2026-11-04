@@ -27,7 +27,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import KEY_FILE, keys, library, notes, pipeline, sources
+from . import KEY_FILE, imports, keys, library, notes, pipeline, sources
 from .media import ocr_lines, paragraphs
 
 STATIC = Path(__file__).parent / "static"
@@ -68,17 +68,38 @@ def _update(job_id: str, **fields) -> None:
         jobs[job_id].update(fields)
 
 
+# An import downloads many posts in a row. Instagram slows down or blocks clients
+# that fetch too fast, so imported posts start at least this many seconds apart.
+IMPORT_PACE_S = 6.0
+_last_import_fetch = 0.0
+
+
 def _worker() -> None:
+    global _last_import_fetch
     while True:
         job_id = _queue.get()
         job = jobs[job_id]
+        if job["status"] == "cancelled":
+            continue
+        if job.get("batch"):
+            wait = _last_import_fetch + IMPORT_PACE_S - time.time()
+            if wait > 0:
+                _update(job_id, step="waiting a few seconds (Instagram limits fast downloads)")
+                time.sleep(wait)
+            _last_import_fetch = time.time()
         _update(job_id, status="running", started=time.time())
         try:
             progress = lambda m: _update(job_id, step=m.strip())  # noqa: E731
             if job.get("folder"):  # a video already processed, waiting for notes
                 folder = pipeline.write_notes(library.resolve_folder(job["folder"]), progress=progress)
             else:
-                folder = pipeline.run(job["input"], library.DEFAULT_ROOT, keep_video=True, progress=progress)
+                folder = pipeline.run(job["input"], library.DEFAULT_ROOT, keep_video=True,
+                                      with_notes=job.get("with_notes", True), progress=progress)
+            if job.get("extra_meta"):  # an imported post: when it was saved, its collections
+                meta_file = folder / "meta.json"
+                meta = json.loads(meta_file.read_text())
+                meta.update(job["extra_meta"])
+                meta_file.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n")
             upload = job.get("upload")
             if upload:  # an uploaded file lives in a temp folder; keep it with its note
                 shutil.move(upload, folder / f"video{Path(upload).suffix.lower()}")
@@ -91,7 +112,10 @@ def _worker() -> None:
             _update(job_id, status="done", folder=folder.name, step=None,
                     waiting=d["notes"] is None, notes_error=d["meta"].get("notes_error"))
         except Exception as e:  # shown to the user in the job list
-            _update(job_id, status="failed", error=str(e), step=None)
+            if job.get("batch") and "no video" in str(e).lower():
+                _update(job_id, status="skipped", error="a photo post, no video", step=None)
+            else:
+                _update(job_id, status="failed", error=str(e), step=None)
         finally:
             _update(job_id, finished=time.time())
 
@@ -99,17 +123,18 @@ def _worker() -> None:
 threading.Thread(target=_worker, daemon=True).start()
 
 
-def _enqueue(label: str, input_: str | None, upload: str | None = None, folder: str | None = None) -> dict:
+def _enqueue(label: str, input_: str | None, upload: str | None = None, folder: str | None = None,
+             **extra) -> dict:
     job_id = uuid.uuid4().hex[:8]
     with _lock:
         jobs[job_id] = {"id": job_id, "label": label, "input": input_, "upload": upload, "folder": folder,
-                        "status": "queued", "step": None, "created": time.time()}
+                        "status": "queued", "step": None, "created": time.time(), **extra}
     _queue.put(job_id)
     return _public(jobs[job_id])
 
 
 def _public(job: dict) -> dict:
-    return {k: v for k, v in job.items() if k not in ("input", "upload")}
+    return {k: v for k, v in job.items() if k not in ("input", "upload", "extra_meta", "with_notes")}
 
 
 @app.post("/api/jobs")
@@ -135,6 +160,76 @@ async def create_job(url: str | None = Form(None), file: UploadFile | None = Fil
 def list_jobs():
     with _lock:
         return sorted((_public(j) for j in jobs.values()), key=lambda j: -j["created"])
+
+
+# --- Import: the posts you saved on Instagram, from Instagram's own data export -----
+
+MAX_EXPORT = 1024 * 1024 * 1024  # an export with media can be large; we only read the saved-posts files
+
+
+@app.post("/api/import/read")
+async def import_read(files: list[UploadFile] = File(...)):
+    """Reads an export (the ZIP, or the files of the folder it unzips to) and lists
+    its saved posts. Nothing is downloaded yet."""
+    read, total = [], 0
+    for f in files:
+        data = await f.read(MAX_EXPORT + 1)
+        total += len(data)
+        if total > MAX_EXPORT:
+            raise HTTPException(413, "That's over 1 GB. Export again with only “Saved” ticked.")
+        read.append((f.filename or "", data))
+    try:
+        found = imports.read_export(read)
+    except imports.ExportProblem as e:
+        raise HTTPException(400, str(e))
+    have = library.instagram_codes()
+    with _lock:  # posts already queued from an earlier import count as in the library too
+        have |= {sources.instagram_code(j["input"] or "") for j in jobs.values()
+                 if j.get("batch") and j["status"] in ("queued", "running")}
+    for p in found["posts"]:
+        p["in_library"] = p["code"] in have
+    return found
+
+
+class ImportPost(BaseModel):
+    code: str
+    kind: str = "reel"
+    saved_at: str | None = None
+    author: str | None = None
+    collections: list[str] = []
+
+
+class ImportIn(BaseModel):
+    posts: list[ImportPost]
+    with_notes: bool = False
+
+
+@app.post("/api/import/start")
+def import_start(body: ImportIn):
+    """Queues the chosen posts, oldest saved first, a few seconds apart."""
+    batch = uuid.uuid4().hex[:8]
+    with_notes = body.with_notes and keys.active()
+    queued = 0
+    for p in sorted(body.posts, key=lambda p: p.saved_at or ""):
+        if not imports.POST.fullmatch(imports.post_url(p.kind, p.code).rstrip("/")):
+            continue  # not a post code: never queue an arbitrary link from the request
+        url = imports.post_url(p.kind, p.code)
+        _enqueue(f"@{p.author}" if p.author else url, url, batch=batch, with_notes=with_notes,
+                 extra_meta={"saved_at": p.saved_at, "saved_collections": p.collections, "imported": True})
+        queued += 1
+    return {"batch": batch, "queued": queued}
+
+
+@app.post("/api/import/stop")
+def import_stop(batch: str):
+    """Cancels the posts of an import that haven't started; the one running finishes."""
+    with _lock:
+        n = 0
+        for j in jobs.values():
+            if j.get("batch") == batch and j["status"] == "queued":
+                j.update(status="cancelled", step=None)
+                n += 1
+    return {"cancelled": n}
 
 
 @app.get("/api/status")

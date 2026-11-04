@@ -109,6 +109,39 @@ your browser at `http://127.0.0.1:8765`, an address that works only on your own 
 To keep MOODscroll in your Dock, open it once, then drag it from Applications onto the
 Dock.
 
+### Import everything you saved on Instagram
+
+Instagram can send you a file listing every post you've saved. MOODscroll reads it, so
+it never needs your Instagram login.
+
+1. **Ask Instagram for the file** (once, about 2 minutes). In the Instagram app: your
+   profile → **☰** → **Accounts Center** → **Your information and permissions** →
+   **Export your information** → **Create export**. Pick your Instagram profile, then
+   **Export to device**. On **Confirm your export**, set:
+   - **Customize information**: only **Saved**
+   - **Date range**: **All time**
+   - **Format**: **JSON** (HTML works too)
+   - **Media quality**: any; the file only holds links
+
+   Then tap **Start export**.
+2. **Wait for Instagram's email** (*"Your Meta information download is ready"*). With
+   only Saved ticked, it usually comes within minutes. Download the file from the
+   **Export your information** page within four days. The easiest way is on your Mac:
+   open instagram.com, go to the same page, and download it there. From your phone,
+   AirDrop it to your Mac or save it to iCloud Drive.
+3. **Drop it in the app.** Click **import your Instagram saved posts** under the link
+   box, then drop the ZIP, or the folder it unzipped to. You'll see every saved post, grouped by your collections,
+   with the ones already in your library left out.
+4. **Pick what to import** and click **Import**. Videos are downloaded a few seconds
+   apart, because Instagram blocks apps that download too fast. Each takes about
+   15 seconds. Photo posts are skipped. You can keep using the app meanwhile, or click
+   **Stop**.
+
+The notes then wait for Claude Code or Codex (*"finish my MOODscroll notes"*); batches
+of 20 to 50 are easiest on your subscription. With an API key on, you can have the app
+write them as it goes, and it shows the cost first. To pick up later where you left
+off, drop the same ZIP again: posts already in your library are skipped.
+
 ### Claude Code and Codex
 
 Talk to it the way you'd talk to a person:
@@ -218,6 +251,7 @@ uv run pytest
 | `notes.py` | the note schema, the prompt, and the optional API call |
 | `render.py` | turns a note into Markdown |
 | `library.py` | search, and the list of videos waiting for notes |
+| `imports.py` | reads Instagram's data export (the list of your saved posts) |
 | `keys.py` | the optional API key: check, save, switch off and on |
 | `web.py`, `static/` | the app: a FastAPI server bound to 127.0.0.1 that refuses requests from other websites |
 | `mcp_server.py` | the Claude Code / Codex connection |
