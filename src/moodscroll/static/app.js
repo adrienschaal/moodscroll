@@ -72,7 +72,7 @@ function showHome() {
   // Notes written in Claude Code or Codex land in the same library: while anything
   // is waiting, check every few seconds so they appear without a reload.
   liveTimer = setInterval(() => {
-    if (status?.waiting && !document.hidden && !$(".menu:not([hidden])")) { loadStatus(); loadLibrary(); }
+    if (status?.waiting && !document.hidden && !$(".menu:not([hidden])")) { loadStatus(); loadLibrary(); pollJobs(); }
   }, 4000);
 }
 
@@ -165,7 +165,7 @@ document.addEventListener("click", async (e) => {
     if (act === "delete-note") {
       if (!confirm(`Delete “${el.dataset.title}”?\n\nIt moves to the Trash. To restore it, drag it from the Trash back into your Moodscroll folder.`)) return;
       await api(`/api/notes/${encodeURIComponent(el.dataset.folder)}`, { method: "DELETE" });
-      loadLibrary(); loadStatus();
+      loadLibrary(); loadStatus(); pollJobs();  // its "waiting for notes" row goes too
     }
     if (act === "stop-import") { await post(`/api/import/stop?batch=${encodeURIComponent(el.dataset.batch)}`); pollJobs(); }
     if (act === "show-key") showKeyForm();

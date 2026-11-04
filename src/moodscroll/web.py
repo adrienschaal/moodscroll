@@ -158,7 +158,25 @@ async def create_job(url: str | None = Form(None), file: UploadFile | None = Fil
 @app.get("/api/jobs")
 def list_jobs():
     with _lock:
+        _refresh_finished()
         return sorted((_public(j) for j in jobs.values()), key=lambda j: -j["created"])
+
+
+def _refresh_finished() -> None:
+    """A finished job's row says which note it made and whether that note still waits.
+    Both change after the fact: the note gets written (and its folder renamed) by
+    Claude Code or Codex, or the note gets deleted. Rows whose note is gone are
+    dropped. Called with _lock held."""
+    for job_id, j in list(jobs.items()):
+        if j["status"] != "done" or not j.get("folder"):
+            continue
+        try:
+            folder = library.resolve_folder(j["folder"])  # follows a rename
+        except ValueError:
+            del jobs[job_id]  # the note was deleted
+            continue
+        has_notes = (folder / "notes.json").exists()
+        j.update(folder=folder.name, waiting=not has_notes)
 
 
 # --- Import: the posts you saved on Instagram, from Instagram's own data export -----
@@ -341,6 +359,9 @@ def delete_note(name: str):
         target = TRASH / f"{folder.name} {n}"
         n += 1
     shutil.move(str(folder), target)
+    with _lock:  # its row in the job list goes too
+        for job_id in [k for k, j in jobs.items() if j.get("folder") == folder.name]:
+            del jobs[job_id]
     return {"trashed": folder.name}
 
 

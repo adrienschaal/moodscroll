@@ -111,3 +111,27 @@ def test_delete_moves_to_trash(client, tmp_path, monkeypatch):
     assert client.delete("/api/notes/2026-11-03-clip").json() == {"trashed": "2026-11-03-clip"}
     assert (trash / "2026-11-03-clip" / "note.md").exists() and client.get("/api/library").json() == []
     assert (tmp_path / "secret.txt").exists()
+
+
+def test_job_row_follows_its_note(client, tmp_path, monkeypatch):
+    """A finished job's "waiting for notes" row goes away when the note is deleted,
+    and stops waiting (with the new folder name) once the notes are written."""
+    monkeypatch.setattr(web, "TRASH", tmp_path.parent / (tmp_path.name + "-trash"))
+    for name in ("2026-11-04-a", "2026-11-04-b"):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "meta.json").write_text("{}")
+    with web._lock:
+        web.jobs.clear()
+        for jid, name in (("j1", "2026-11-04-a"), ("j2", "2026-11-04-b")):
+            web.jobs[jid] = {"id": jid, "label": name, "input": None, "status": "done",
+                             "folder": name, "waiting": True, "created": 0}
+    client.delete("/api/notes/2026-11-04-a")
+    assert [j["id"] for j in client.get("/api/jobs").json()] == ["j2"]
+
+    renamed = tmp_path / "2026-11-04-real-title"  # what add_notes does after notes are saved
+    (tmp_path / "2026-11-04-b").rename(renamed)
+    (renamed / "notes.json").write_text("{}")
+    (renamed / "meta.json").write_text(json.dumps({"previous_names": ["2026-11-04-b"]}))
+    job = client.get("/api/jobs").json()[0]
+    assert job["folder"] == "2026-11-04-real-title" and job["waiting"] is False
+    web.jobs.clear()
