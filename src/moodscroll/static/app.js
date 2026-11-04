@@ -383,7 +383,20 @@ async function showNote(folder, openAt = null) {
     if (t === undefined || !player) return;
     player.currentTime = Number(t);
     player.play();
+    // Bring the video back into view so you see what you clicked on.
+    const r = player.getBoundingClientRect();
+    if (r.top < 70 || r.bottom > innerHeight) player.scrollIntoView({ block: "start" });
   };
+  // The video keeps the volume (and mute) you last set, on every note.
+  if (player) {
+    try {
+      const v = JSON.parse(localStorage.getItem("moodscroll-volume") || "null");
+      if (v) { player.volume = v.volume; player.muted = v.muted; }
+    } catch { /* first time, or storage blocked: browser default */ }
+    player.addEventListener("volumechange", () => {
+      try { localStorage.setItem("moodscroll-volume", JSON.stringify({ volume: player.volume, muted: player.muted })); } catch { /* not kept */ }
+    });
+  }
   // Highlight the transcript line being spoken.
   if (player) {
     const lines = [...view.querySelectorAll(".seg")];
